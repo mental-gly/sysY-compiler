@@ -26,6 +26,8 @@ Compared to `C99` Standard, we cut off:
 ## Roadmaps
 - [ ] Basic numeric type support
 - [ ] Linear control flow
+- [ ] Pointers
+- [ ] Variable shadowing 
 - [ ] Non-Linear control flow like for, if
 - [ ] Arrays, struct, typedef
 - [ ] Preprocessor macros

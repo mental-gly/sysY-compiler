@@ -5,6 +5,8 @@ Here are code examples:
 $ clang -Xclang -ast-dump # dump ast
 $ clang -S -emit-llvm # dump LLVM IR
 ```
+When construct LLVM IR types or constants, a LLVM Contexts module maintains ref counts.
+Thus same type of Types and Constants are shared.
 
 ---
 #### Function Declarations and Definition
@@ -162,6 +164,22 @@ declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
 attributes #0 = { noinline nounwind optnone uwtable "frame-pointer"="all" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
 attributes #1 = { nofree nosync nounwind readnone speculatable willreturn }
 ```
+Another good example is 
+```c
+int f() {
+    int c, d, *p;
+}
+```
+and corresponding part of Clang AST:
+```bash
+`-FunctionDecl 0x55cc612d96b0 <<source>:1:1, line:3:1> line:1:5 f 'int ()'
+  `-CompoundStmt 0x55cc612d9980 <col:9, line:3:1>
+    `-DeclStmt 0x55cc612d9968 <line:2:5, col:17>
+      |-VarDecl 0x55cc612d97b0 <col:5, col:9> col:9 c 'int'
+      |-VarDecl 0x55cc612d9830 <col:5, col:12> col:12 d 'int'
+      `-VarDecl 0x55cc612d98e0 <col:5, col:16> col:16 p 'int *'
+```
+
 
 #### Inner variable shadows outer variable
 ```c
@@ -229,6 +247,41 @@ declare void @llvm.dbg.declare(metadata, metadata, metadata) #1
 
 attributes #0 = { noinline nounwind optnone uwtable "frame-pointer"="all" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
 attributes #1 = { nofree nosync nounwind readnone speculatable willreturn }
+```
+
+#### Get variable address
+Unary operator `&`
+```c
+int f(int a, int b) {
+    int *p = &a;
+}
+```
+
+It's worthwhile to mention `cannot overflow` metadata.
+```bash
+TranslationUnitDecl 0x55a4c43840e8 <<invalid sloc>> <invalid sloc>
+|-TypedefDecl 0x55a4c43849b0 <<invalid sloc>> <invalid sloc> implicit __int128_t '__int128'
+| `-BuiltinType 0x55a4c4384690 '__int128'
+|-TypedefDecl 0x55a4c4384a20 <<invalid sloc>> <invalid sloc> implicit __uint128_t 'unsigned __int128'
+| `-BuiltinType 0x55a4c43846b0 'unsigned __int128'
+|-TypedefDecl 0x55a4c4384d28 <<invalid sloc>> <invalid sloc> implicit __NSConstantString 'struct __NSConstantString_tag'
+| `-RecordType 0x55a4c4384b00 'struct __NSConstantString_tag'
+|   `-Record 0x55a4c4384a78 '__NSConstantString_tag'
+|-TypedefDecl 0x55a4c4384dc0 <<invalid sloc>> <invalid sloc> implicit __builtin_ms_va_list 'char *'
+| `-PointerType 0x55a4c4384d80 'char *'
+|   `-BuiltinType 0x55a4c4384190 'char'
+|-TypedefDecl 0x55a4c43c55a0 <<invalid sloc>> <invalid sloc> implicit __builtin_va_list 'struct __va_list_tag [1]'
+| `-ConstantArrayType 0x55a4c4385060 'struct __va_list_tag [1]' 1 
+|   `-RecordType 0x55a4c4384ea0 'struct __va_list_tag'
+|     `-Record 0x55a4c4384e18 '__va_list_tag'
+`-FunctionDecl 0x55a4c43c5770 <<source>:3:1, line:5:1> line:3:5 f 'int (int, int)'
+  |-ParmVarDecl 0x55a4c43c5610 <col:7, col:11> col:11 used a 'int'
+  |-ParmVarDecl 0x55a4c43c5690 <col:14, col:18> col:18 b 'int'
+  `-CompoundStmt 0x55a4c43c5968 <col:21, line:5:1>
+    `-DeclStmt 0x55a4c43c5950 <line:4:5, col:16>
+      `-VarDecl 0x55a4c43c58b0 <col:5, col:15> col:10 p 'int *' cinit
+        `-UnaryOperator 0x55a4c43c5938 <col:14, col:15> 'int *' prefix '&' cannot overflow
+          `-DeclRefExpr 0x55a4c43c5918 <col:15> 'int' lvalue ParmVar 0x55a4c43c5610 'a' 'int'
 ```
 
 ## Special Thanks

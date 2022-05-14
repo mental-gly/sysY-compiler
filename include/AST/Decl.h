@@ -8,7 +8,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <llvm/ADT/SmallVector.h>
+#include <llvm/ADT/ilist.h>
 #include <llvm/ADT/StringRef.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Value.h>
 #include "TypeInfo.h"
 
 
@@ -99,6 +103,8 @@ public:
     void setBody(Stmt *B);
     TypeInfo *getReturnType() const;
     ParamDecl *getParams() const;
+
+    llvm::Function* CodeGen();
 private:
     llvm::SmallVector<ParamDecl *, 10> param_list;
     // The body is usually a {} braced `CompoundStmt`.

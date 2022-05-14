@@ -9,7 +9,7 @@
 
 #include <map>
 #include <list>
-#include "../logging.h"
+#include "logging.h"
 
 /// \brief Hash table map symbol name to some attribute
 /// based on llvm::StringMap, 

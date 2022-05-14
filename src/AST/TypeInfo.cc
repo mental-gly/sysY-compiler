@@ -3,6 +3,8 @@
 std::vector<TypeInfo> TypeContext::type_table;
 
 void TypeContext::Init(){
+    // special type
+    TypeContext::type_table.emplace_back("void", 0, TypeInfo::kVoid);
     // register primitive numeric types
     REGISTER_NUMERIC(float);   
     REGISTER_NUMERIC(double);

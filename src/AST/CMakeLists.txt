@@ -1,0 +1,6 @@
+set(AST_SOURCES
+    TypeInfo.cc
+)
+
+add_library(AST STATIC ${AST_SOURCES})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)

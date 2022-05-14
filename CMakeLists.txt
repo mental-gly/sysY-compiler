@@ -6,6 +6,10 @@ set(CMAKE_CXX_STANDARD 14)
 # compile platform info
 message(STATUS "CMake_HOST_SYSTEM_NAME ${CMAKE_HOST_SYSTEM_NAME}")
 message(STATUS "CMAKE_HOST_SYSTEM_VERSION ${CMAKE_HOST_SYSTEM_VERSION}")
+# backtrace need Linux syscall
+if (CMAKE_SYSTEM_NAME MATCHES "Linux")
+    add_compile_definitions(NEED_LOG_STACK_TRACE)
+endif()
 
 # compiler info
 message(STATUS "Found C Compiler: ${CMAKE_C_COMPILER}")
@@ -24,6 +28,7 @@ if (BUILD_WITH_LLVM)
 
     # llvm libraries use built-in rtti
     add_compile_options(-fno-exceptions -fno-rtti)
+    add_compile_options(-ltinfo -lpthread)
 endif()
 
 # set default cmake build type as Debug
@@ -32,7 +37,7 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 
 include_directories(include)
-
+add_subdirectory(src)
 
 if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
     enable_testing()

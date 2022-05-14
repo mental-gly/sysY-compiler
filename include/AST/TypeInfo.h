@@ -24,6 +24,7 @@ struct TypeInfo {
     /// \todo set type use
     enum : uint32_t {
         kUnkown,
+        kVoid,
         kNumeric,
         kPointer,
         kArrays,

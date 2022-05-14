@@ -26,7 +26,7 @@
 
 
 
-std::string BackTrace(
+inline std::string BackTrace(
     size_t start_frame = 1,
     const size_t stack_size = STACK_TRACE_SIZE)
 {
@@ -73,7 +73,7 @@ std::string BackTrace(
 #else 
 
 // dummy backtrace
-std::string BackTrace(
+inline std::string BackTrace(
     size_t start_frame = 1,
     const size_t stack_size = STACK_TRACE_SIZE)
 {

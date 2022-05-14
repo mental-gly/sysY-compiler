@@ -10,6 +10,7 @@
 #endif
 
 #include <iostream>
+#include <sstream>
 #include <cstdlib>
 #include <string>
 #include <memory>
@@ -22,12 +23,11 @@
 // and -rdynamic compile flag to fetch symbols
 #include <cxxabi.h>
 #include <execinfo.h>
-#include <sstream>
 
 
 
 std::string BackTrace(
-    size_t start_frame = 0,
+    size_t start_frame = 1,
     const size_t stack_size = STACK_TRACE_SIZE)
 {
     std::ostringstream stack_trace_os;
@@ -39,7 +39,7 @@ std::string BackTrace(
     char **msgs = backtrace_symbols(frame_info.data(), nframes);
     if (msgs != nullptr) {
         for (int frame = start_frame; frame < nframes; ++frame) {
-            stack_trace_os << '#' << frame - start_frame << ' ';
+            stack_trace_os << '\t#' << frame - start_frame << ' ';
             std::string msg(msgs[frame]);
             size_t symbol_start;
             size_t symbol_end;
@@ -74,13 +74,31 @@ std::string BackTrace(
 
 // dummy backtrace
 std::string BackTrace(
-    size_t start_frame = 0,
+    size_t start_frame = 1,
     const size_t stack_size = STACK_TRACE_SIZE)
 {
-    return std::string("disabled backtrace\n");
+    return std::string("\tdisabled backtrace\n");
 }
 
 #endif
+
+
+class LogFatal {
+public:
+    LogFatal() = delete;
+    LogFatal(const char *file, size_t line) 
+    {
+        _M_stream << "In " << file << ":" << line << ":\n\t";
+    }
+    ~LogFatal() { 
+        std::cerr << _M_stream.str();
+        abort();
+     }
+    std::ostringstream &stream() { return _M_stream; }
+
+private:
+    std::ostringstream _M_stream;
+};
 
 
 #define CHECK_FUNC(name, op)                        \
@@ -97,20 +115,16 @@ CHECK_FUNC(_EQ, ==)
 CHECK_FUNC(_NE, !=)
 
 #define CHECK_BINARY_OP(name, op, x, y)                                             \
-    if (!LogCheck##name(x, y)) {                                                    \
-        std::cerr << "Check failed in " << __FILE__ << ':' << __LINE__ << " "       \
-                     << #x " " #op " " #y << "\n";                                  \
-        std::cerr << BackTrace();                                                   \
-        abort();                                                                    \
-    }
+    if (!LogCheck##name(x, y))                                                      \
+        LogFatal(__FILE__, __LINE__).stream()                                       \
+            <<  "Check failed : "   << #x " " #op " " #y << "\n"                    \
+            << BackTrace() << ":"                                                   \
 
 #define CHECK(x)                                                                    \
-    if (!(x)) {                                                                     \
-        std::cerr << "Check failed in " << __FILE__ << ':' << __LINE__ << " "       \
-                     << #x << "\n";                                                 \
-        std::cerr << BackTrace();                                                   \
-        abort();                                                                    \
-    }
+    if (!(x))                                                                      \
+        LogFatal(__FILE__, __LINE__).stream()                                       \
+            << "Check failed : " << #x << "\n"                                      \
+            << BackTrace() << ":"                                                   
 
 #define CHECK_LT(x, y) CHECK_BINARY_OP(_LT, <, x, y)
 #define CHECK_GT(x, y) CHECK_BINARY_OP(_GT, >, x, y)

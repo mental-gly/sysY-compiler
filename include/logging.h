@@ -82,6 +82,16 @@ std::string BackTrace(
 
 #endif
 
+class Log {
+public:
+    Log() = default;
+    ~Log() {
+        std::cout << _M_stream.str();
+    }
+    std::ostringstream &stream() { return _M_stream; }
+private:
+    std::ostringstream _M_stream;
+};
 
 class LogFatal {
 public:
@@ -134,5 +144,8 @@ CHECK_FUNC(_NE, !=)
 #define CHECK_NE(x, y) CHECK_BINARY_OP(_NE, !=, x, y)
 
 
+#define LOG_FATAL LogFatal(__FILE__, __LINE__)
+#define LOG_INFO  Log()
+#define LOG(severity) LOG_##severity.stream()
 
 #endif // LOGGING_H

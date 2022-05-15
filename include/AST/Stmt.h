@@ -29,6 +29,7 @@ class VarDecl;
 class Stmt {
 public:
     virtual ~Stmt() = default;
+public:
     virtual llvm::Value *CodeGen() = 0;
 };
 
@@ -45,16 +46,7 @@ private:
 };
 
 
-/// \brief Function call.
-class CallStmt : public Stmt {
-public:
-    llvm::Value *CodeGen() override;
-    TypeInfo *getReturnType();
-private:
-    // Callee fucntion.
-    llvm::StringRef Callee;
-    llvm::SmallVector<ExprStmt *, 10> Args;
-};
+
 
 
 /// \brief curly braced statement block
@@ -71,7 +63,8 @@ private:
 };
 
 
-/// \brief expression (literals included).
+/// \brief expression (literals included);
+/// expression has type checking.
 class ExprStmt : public Stmt {
 public:
     // category expression values borrowing C++11 scheme.
@@ -81,16 +74,65 @@ public:
     };
 public:
     ExprStmt() = default;
-    ExprStmt(TypeInfo *T, enum ExprValueKind VK) {
-        ExprType = T;
+    ExprStmt(enum ExprValueKind VK, TypeInfo *T = nullptr) {
         ValueKind = VK;
+        ExprType = T;
     }
     ExprStmt(const ExprStmt &) = delete;
-
+public:
+    /// \brief Get the expression type;
+    /// if null, calculate the expression type.
+    /// The design of this function is owe to bottom up parsing 
+    /// maynot get the type immediately, otherwise it's costly to
+    /// modify the attribute grammar such that all attribute is 
+    /// synthesis attribute.
+    /// We may use hand-written top-down paresr to fix this problem.
+    virtual TypeInfo *getType() = 0;
 protected:
-    TypeInfo *ExprType;
     enum ExprValueKind ValueKind;
+    TypeInfo *ExprType;
 }; 
+
+
+/// \brief Function call that may have a return value.
+class CallStmt : public ExprStmt {
+public:
+    llvm::Value *CodeGen() override;
+    /// \brief Get the function call return type.
+    TypeInfo *getType() override;
+private:
+    // Callee fucntion.
+    llvm::StringRef Callee;
+    llvm::SmallVector<ExprStmt *, 10> Args;
+};
+
+
+/// \brief Explicit showing the AST refer to a variable
+/// given the symbol, DeclRef found the latest definition in LLVM IR SSA form.
+class DeclRef : public ExprStmt {
+public:
+    DeclRef() = delete;
+    DeclRef(llvm::StringRef symbol);
+    llvm::Value *CodeGen() override;
+    TypeInfo *getType() override;
+private:
+    Stmt *decl;
+    llvm::StringRef symbol;
+};
+
+/// \brief Array subscipt reference with the type A[4];
+/// 'A' is Base and '4' is Idx.
+class ArraySubScript : public ExprStmt {
+public:
+    ArraySubScript() = delete;
+    ArraySubScript(ExprStmt *Base, ExprStmt *Idx);
+    llvm::Value *CodeGen() override;
+    /// \brief Get the type of array subscription like 
+    /// \example for int A[]; A[4] is a 'int'.
+    TypeInfo *getType() override;
+private:
+    ExprStmt *base, *idx;
+};
 
 
 /// \brief Binary operations like plus, minus in AST.
@@ -108,10 +150,11 @@ public:
     BinaryOperator() = delete;
     // If given two operands, the type of result need to deduce later.
     BinaryOperator(enum BinaryOpcode opcode, Stmt *LHS, Stmt *RHS)
-        : Opcode(opcode), SubExprs({LHS, RHS}) { }
+        : ExprStmt(ExprStmt::RValue), Opcode(opcode), SubExprs({LHS, RHS}) { }
 public:
     uint32_t getOpcode() const { return Opcode; }
     llvm::Value *CodeGen() override;
+    TypeInfo *getType() override;
 protected:
     llvm::Value *Operands[2];
     Stmt *SubExprs[2];
@@ -129,6 +172,7 @@ public:
     IntegerLiteral(TypeInfo *T, llvm::StringRef valStr, uint8_t radix);
 public:
     llvm::Value *CodeGen() override;
+    TypeInfo *getType() override;
 protected:
     llvm::APInt Value;
     llvm::IntegerType *Type;
@@ -145,6 +189,7 @@ public:
     FloatingLiteral(TypeInfo *T, float val); 
 public:
     llvm::Value *CodeGen() override;
+    TypeInfo *getType() override;
 protected:
     // llvm::APFloat support convertXXX for casting.
     // llvm::IEEEFloat also works

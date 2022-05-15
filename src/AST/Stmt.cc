@@ -35,7 +35,7 @@ llvm::Value *BinaryOperator::CodeGen() {
 
 
 IntegerLiteral::IntegerLiteral(TypeInfo *T, uint64_t val, bool isSigned=false) 
-    : ExprStmt(T, RValue),
+    : ExprStmt(RValue, T),
         Value(T->ByteSize * 8, val, isSigned) 
 {
     assert(8 % T->ByteSize == 0 && "IntegerLiteral supports 1, 2, 4, 8 btyes integer only!");
@@ -43,7 +43,7 @@ IntegerLiteral::IntegerLiteral(TypeInfo *T, uint64_t val, bool isSigned=false)
 }
 
 IntegerLiteral::IntegerLiteral(TypeInfo *T, llvm::StringRef valStr, uint8_t radix)
-    : ExprStmt(T, RValue),
+    : ExprStmt(RValue, T),
         Value(T->ByteSize * 8, valStr, radix)
 {
     assert(8 % T->ByteSize == 0 && "IntegerLiteral supports 1, 2, 4, 8 btyes integer only!");
@@ -64,7 +64,7 @@ llvm::Value *IntegerLiteral::CodeGen() {
 
 
 FloatingLiteral::FloatingLiteral(TypeInfo *T, double val) 
-    : ExprStmt(T, RValue),
+    : ExprStmt(RValue, T),
         Value(val)
 {
     assert(T->ByteSize * 8 == 64 && "Not a double Type T");
@@ -72,7 +72,7 @@ FloatingLiteral::FloatingLiteral(TypeInfo *T, double val)
 }
 
 FloatingLiteral::FloatingLiteral(TypeInfo *T, float val)
-    : ExprStmt(T, RValue),
+    : ExprStmt(RValue, T),
         Value(val)
 {   
     assert(T->ByteSize * 8 == 64 && "Not a double Type T");

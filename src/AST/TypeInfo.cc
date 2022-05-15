@@ -19,7 +19,7 @@ void TypeContext::Init(){
 }
 
 
-bool TypeContext::checkTypeEquivalance(TypeInfo *Src, TypeInfo *Tgt) {
+bool TypeContext::checkEquivalance(TypeInfo *Src, TypeInfo *Tgt) {
     switch (Src->Kind) {
         // primitive type 
         case TypeInfo::kNumeric:
@@ -37,7 +37,7 @@ bool TypeContext::checkTypeEquivalance(TypeInfo *Src, TypeInfo *Tgt) {
 }
 
 
-TypeInfo *TypeContext::findTypeByName(const std::string &name_key) {
+TypeInfo *TypeContext::find(const std::string &name_key) {
     size_t hashed_name = std::hash<std::string>()(name_key);
     auto type = std::find_if(type_table.cbegin(), type_table.cend(),
                                     [&](const TypeInfo &Info){ return Info.NameHash == hashed_name; });
@@ -53,7 +53,7 @@ TypeInfo &TypeContext::createNumericType(const std::string &name_key, size_t siz
 }
 
 TypeInfo &TypeContext::createPointerType(const std::string &name_key) {
-    auto base_type = findTypeByName(name_key);
+    auto base_type = find(name_key);
     CHECK(base_type) << "Unknown type " << name_key;
     type_table.emplace_back(std::hash<std::string>()(name_key + "*"),
                             sizeof(void*), TypeInfo::kPointer);

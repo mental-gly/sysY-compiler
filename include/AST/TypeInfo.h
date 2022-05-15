@@ -50,9 +50,9 @@ class TypeContext {
 public:
     /// \brief register primitive types.
     static void Init();
-    static bool checkTypeEquivalance(TypeInfo *Src, TypeInfo *Tgt); 
+    static bool checkEquivalance(TypeInfo *Src, TypeInfo *Tgt); 
 
-    static TypeInfo *findTypeByName(const std::string &name_key);
+    static TypeInfo *find(const std::string &name_key);
 
     /// \brief register numeric type with \p name and \p size
     static TypeInfo &createNumericType(const std::string &name_key, size_t size);

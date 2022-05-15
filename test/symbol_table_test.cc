@@ -3,14 +3,15 @@
 #include <string>
 
 int main() {
-    SymbolTable<std::string> table;
-    table.insertSymbol("a", "int");
+    SymbolTable<int> table;
+    table.insertSymbol("a", 1);
     table.CreateScope();
-    table.insertSymbol("a", "double");
-    table.insertSymbol("b", "int");
-    CHECK_EQ(table.lookup("a"), "double");
+    table.insertSymbol("a", 2);
+    table.insertSymbol("b", 1);
+    CHECK_EQ(table.lookup("a"), 2);
     table.LeaveScope();
-    CHECK_EQ(table.lookup("a"), "int");
+    CHECK_EQ(table.lookup("a"), 1);
     // would cause error
-    table.lookup("b");
+    // table.lookup("b");
+    table.LeaveScope();
 }

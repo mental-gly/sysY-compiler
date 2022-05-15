@@ -23,7 +23,7 @@ int g();
 ```
 
 
-The root of the AST is a `TranslationUnit` (in libclang is type `CXTranslationUnit`), and Clang AST treat decl same as def exception the `CompoundStmt` function body. Note that return operator has an implicit cast on AST.
+The root of the AST is a `TranslationUnit` (in libclang is type `CXTranslationUnit`), and Clang AST treat decl same as def except the `CompoundStmt` function body. Note that return Stmt has a child implicit cast.
 ```bash
 TranslationUnitDecl 0x5622ebc340e8 <<invalid sloc>> <invalid sloc>
 |-TypedefDecl 0x5622ebc349b0 <<invalid sloc>> <invalid sloc> implicit __int128_t '__int128'
@@ -56,9 +56,9 @@ TranslationUnitDecl 0x5622ebc340e8 <<invalid sloc>> <invalid sloc>
 `-FunctionDecl 0x5622ebc75b60 <line:7:1, col:7> col:5 g 'int ()'
 ```
 
-But LLVM IR has explicit define and declare
+But LLVM IR has explicit definition and declarations
 ```bash
-efine dso_local i32 @f(i32 %0, i32 %1) #0 !dbg !9 {
+define dso_local i32 @f(i32 %0, i32 %1) #0 !dbg !9 {
   %3 = alloca i32, align 4
   %4 = alloca i32, align 4
   store i32 %0, i32* %3, align 4

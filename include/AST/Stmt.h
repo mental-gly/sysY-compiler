@@ -33,13 +33,19 @@ public:
     virtual llvm::Value *CodeGen() = 0;
 };
 
-/// \brief DeclStmt has a single or mutiple decls
+/// \brief DeclStmt has a single or mutiple decls,
+/// We assume child VarDecl has the same type.
 /// \code int a, b, c=1; double d;
 class DeclStmt : public Stmt {
     using DeclListTy = llvm::SmallVector<VarDecl *, 10>;
 public:
+    Decl() = delete;
+    Decl(VarDecl *DeclList);
+public:
+    /// \brief After Bison parser get type,
+    /// set type of child declaration list.
+    void setType(TypeInfo *type);
     DeclListTy &getDeclList() { return decl_list; }
-    void setDeclList(llvm::SmallVectorImpl<VarDecl *> &decls);
     llvm::Value *CodeGen() override;
 private:
     DeclListTy decl_list;
@@ -97,6 +103,9 @@ protected:
 /// \brief Function call that may have a return value.
 class CallStmt : public ExprStmt {
 public:
+    CallStmt() = delete;
+    CallStmt(llvm::StringRef func, ExprStmt *args);
+public:
     llvm::Value *CodeGen() override;
     /// \brief Get the function call return type.
     TypeInfo *getType() override;
@@ -109,10 +118,10 @@ private:
 
 /// \brief Explicit showing the AST refer to a variable
 /// given the symbol, DeclRef found the latest definition in LLVM IR SSA form.
-class DeclRef : public ExprStmt {
+class DeclRefStmt : public ExprStmt {
 public:
-    DeclRef() = delete;
-    DeclRef(llvm::StringRef symbol);
+    DeclRefStmt() = delete;
+    DeclRefStmt(llvm::StringRef symbol);
     llvm::Value *CodeGen() override;
     TypeInfo *getType() override;
 private:
@@ -122,16 +131,27 @@ private:
 
 /// \brief Array subscipt reference with the type A[4];
 /// 'A' is Base and '4' is Idx.
-class ArraySubScript : public ExprStmt {
+/// \example A[4] = 1;
+class ArraySubscriptStmt : public ExprStmt {
 public:
-    ArraySubScript() = delete;
-    ArraySubScript(ExprStmt *Base, ExprStmt *Idx);
+    ArraySubscriptStmt() = delete;
+    ArraySubscriptStmt(ExprStmt *Base, ExprStmt *Idx);
     llvm::Value *CodeGen() override;
     /// \brief Get the type of array subscription like 
     /// \example for int A[]; A[4] is a 'int'.
     TypeInfo *getType() override;
 private:
     ExprStmt *base, *idx;
+};
+
+
+/// \brief Return statement; `return;` for void function or
+/// `return xxx;` for non-void function.
+class ReturnStmt : public ExprStmt {
+public:
+    ReturnStmt(ExprStmt * ReturnExpr);
+private:
+    ExprStmt *value;
 };
 
 
@@ -171,6 +191,8 @@ public:
     /// \brief Use parsed string to construct a IntegerLiteral
     IntegerLiteral(TypeInfo *T, llvm::StringRef valStr, uint8_t radix);
 public:
+    /// \brief Get the value of literal.
+    uint64_t getVal();
     llvm::Value *CodeGen() override;
     TypeInfo *getType() override;
 protected:

@@ -23,8 +23,8 @@ class ExprStmt;
 class Decl {
 public:
     Decl() = default;
-    Decl(uint32_t K, TypeInfo *T, llvm::StringRef name) 
-        : Kind(K), type(T), name(name) { }
+    Decl(uint32_t K, llvm::StringRef name) 
+        : Kind(K), name(name) { }
 public:
     enum : uint32_t {
         kUnkown,
@@ -40,16 +40,16 @@ public:
     TypeInfo *getType() const { return type; }
 protected:
     uint32_t Kind {kUnkown};
-    TypeInfo *type;
     llvm::StringRef name;
 };
 
-/// \brief general variable declaration.
+/// \brief general variable declaration,
+/// Bison parser cannot get VarDecl type.
 class VarDecl : public Decl {
 public:
     VarDecl() = default;
-    VarDecl(uint32_t K, TypeInfo *T, llvm::StringRef name) 
-        : Decl(K, T, name) { }
+    VarDecl(uint32_t K, llvm::StringRef name) 
+        : Decl(K, name) { }
 public:
     enum DefinitionKind : uint32_t {
         DeclarationOnly,
@@ -66,9 +66,11 @@ public:
     ExprStmt *getInit() const;
     void setInitStyle();
     DefinitionKind hasDefinition() const;
+    void getType();
 protected:
     // initialize expression.
     ExprStmt *init_expr;
+    TypeInfo *type {nullptr};
     enum DefinitionKind definition_kind;
     enum InitializationStyle initialization_style;
 };

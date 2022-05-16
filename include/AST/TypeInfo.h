@@ -54,11 +54,14 @@ public:
 
     static TypeInfo *find(const std::string &name_key);
 
-    /// \brief register numeric type with \p name and \p size
-    static TypeInfo &createNumericType(const std::string &name_key, size_t size);
+    /// \brief register numeric type with \p name and \p size.
+    static TypeInfo *createNumericType(const std::string &name_key, size_t size);
 
-    /// \brief register pointer type \p T* given type name \p T
-    static TypeInfo &createPointerType(const std::string &name_key);
+    /// \brief register pointer type \p T* given type name \p T.
+    static TypeInfo *createPointerType(const std::string &name_key);
+
+    /// \brief register arraytype \p T[] given type name \p T. 
+    static TypeInfo *createArrayType(const std::string &name_key, size_t length);
 
     [[maybe_unused]] static TypeInfo &createStructType(const std::string &name_key, const std::vector<TypeInfo *> members) {
         LOG(FATAL) << "Struct is not supported!";
@@ -72,7 +75,7 @@ private:
 
 #define REGISTER_NUMERIC(X) TypeContext::createNumericType(#X, sizeof(X))
 #define REGISTER_POINTER(X) TypeContext::createPointerType(#X)
-
+#define REGISTER_ARRAY(X, LEN) TypeContext::createArrayType(#X, LEN)
 
 
 

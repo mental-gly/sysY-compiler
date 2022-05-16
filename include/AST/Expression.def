@@ -26,3 +26,6 @@ BINARY_OPERATOR(AShr) // Arithematic shift right
 BINARY_OPERATOR(And) 
 BINARY_OPERATOR(Or)
 BINARY_OPERATOR(Xor)
+
+// Assignment
+BINARY_OPERATOR(Assign)

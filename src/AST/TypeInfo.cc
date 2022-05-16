@@ -1,6 +1,7 @@
 #include "AST/TypeInfo.h"
-
+#include <sstream>
 std::vector<TypeInfo> TypeContext::type_table;
+
 
 void TypeContext::Init(){
     // special type
@@ -46,18 +47,39 @@ TypeInfo *TypeContext::find(const std::string &name_key) {
     else return nullptr;
 }
 
-TypeInfo &TypeContext::createNumericType(const std::string &name_key, size_t size) {
+TypeInfo *TypeContext::createNumericType(const std::string &name_key, size_t size) {
+    auto type = find(name);
+    if (type != nullptr) return type;
     type_table.emplace_back(std::hash<std::string>()(name_key), 
                             size, TypeInfo::kNumeric);
-    return type_table.back();
+    return &type_table.back();
 }
 
-TypeInfo &TypeContext::createPointerType(const std::string &name_key) {
+TypeInfo *TypeContext::createPointerType(const std::string &name_key) {
+    std::ostringstream PointerOs;
+    PointerOs << name_key << "*";
+    auto type = find(PointerOs.str());
+    if (type != nullptr) return type;
     auto base_type = find(name_key);
     CHECK(base_type) << "Unknown type " << name_key;
-    type_table.emplace_back(std::hash<std::string>()(name_key + "*"),
+    type_table.emplace_back(std::hash<std::string>()(PointerOs.str()),
                             sizeof(void*), TypeInfo::kPointer);
-    auto new_type = type_table.back();
-    new_type.Use[0] = base_type;
+    auto new_type = &type_table.back();
+    new_type->Use[0] = base_type;
+    return new_type;
+}
+
+TypeInfo *TypeContext::createArrayType(const std::string &name_key, size_t Length) {
+    // construct array type name
+    std::ostringstream ArrayOs;
+    ArrayOs << name_key << "[" << Length << "]";
+    auto type = find(ArrayOs.str());
+    if (type != nullptr) return type;
+    auto base_type = find(name_key);
+    CHECK(base_type) << "Unknown type " << name_key;
+    type_table.emplace_back(std::hash<std::string>(ArrayOs.str()),
+                            size(base_type->ByteSize * Length), TypeInfo);
+    auto new_type = &type_table.back();
+    new_type->Use[0] = base_type;
     return new_type;
 }

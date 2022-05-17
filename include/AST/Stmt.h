@@ -15,6 +15,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "AST/TypeInfo.h"
+#include "AST/Decl.h"
 #include "logging.h"
 #include <assert.h>
 #include <cstddef>
@@ -22,14 +23,26 @@
 #include <vector>
 #include <list>
 
-class Decl;
-class VarDecl;
 
 /// \brief Statement AST node (expression included)
 class Stmt {
+    uint8_t SubClassID;
 public:
     virtual ~Stmt() = default;
 public:
+    // statement types.
+    enum StmtTy : uint8_t {
+        kUnknown,
+    #define HANDLE_AST_STMT(X) k##X,
+    #define HANDLE_AST_STMT_EXPR(X) k##X ,
+    #include "AST/Stmt.def"
+        NUM_STMTS
+    };
+
+    unsigned getStmtID() const {
+        return SubClassID;
+    }
+public: 
     virtual llvm::Value *CodeGen() = 0;
 };
 
@@ -38,15 +51,20 @@ public:
 /// \code int a, b, c=1; double d;
 class DeclStmt : public Stmt {
     using DeclListTy = llvm::SmallVector<VarDecl *, 10>;
+    uint8_t SubClassID { Stmt::kDeclStmt };
 public:
-    Decl() = delete;
-    Decl(VarDecl *DeclList);
+    DeclStmt() = delete;
+    DeclStmt(VarDecl *DeclList);
 public:
     /// \brief After Bison parser get type,
     /// set type of child declaration list.
     void setType(TypeInfo *type);
     DeclListTy &getDeclList() { return decl_list; }
     llvm::Value *CodeGen() override;
+
+    static bool classof(Stmt *S) {
+        return S->getStmtID() == Stmt::kDeclStmt;
+    }
 private:
     DeclListTy decl_list;
 };
@@ -57,6 +75,7 @@ private:
 
 /// \brief curly braced statement block
 class CompoundStmt : public Stmt {
+    uint8_t SubClassID { Stmt::kCompoundStmt };
 public:
     using StmtListType = llvm::ilist<Stmt *>;
 public:
@@ -64,6 +83,10 @@ public:
     llvm::Value *CodeGen() override;
     /// \brief add sub statements of Compound statement.
     void CreateSubStmt(Stmt *);
+
+    static bool classof(Stmt *S) {
+        return S->getStmtID() == Stmt::kCompoundStmt;
+    }
 private:
     StmtListType Stmts;
 };
@@ -72,9 +95,10 @@ private:
 /// \brief expression (literals included);
 /// expression has type checking.
 class ExprStmt : public Stmt {
+    uint8_t SubClassID { Stmt::kExprStmt };
 public:
     // category expression values borrowing C++11 scheme.
-    enum ExprValueKind : uint32_t {
+    enum ExprValueKind : uint8_t {
         RValue,
         LValue,
     };
@@ -94,6 +118,10 @@ public:
     /// synthesis attribute.
     /// We may use hand-written top-down paresr to fix this problem.
     virtual TypeInfo *getType() = 0;
+
+    static bool classof(Stmt *S) {
+        return S->getStmtID() == Stmt::kExprStmt;
+    }
 protected:
     enum ExprValueKind ValueKind;
     TypeInfo *ExprType;
@@ -102,6 +130,7 @@ protected:
 
 /// \brief Function call that may have a return value.
 class CallStmt : public ExprStmt {
+    uint8_t SubClassID { Stmt::kCallStmt };
 public:
     CallStmt() = delete;
     CallStmt(llvm::StringRef func, ExprStmt *args);
@@ -109,6 +138,10 @@ public:
     llvm::Value *CodeGen() override;
     /// \brief Get the function call return type.
     TypeInfo *getType() override;
+
+    static bool classof(Stmt *S) {
+        return S->getStmtID() == Stmt::kCallStmt;
+    }
 private:
     // Callee fucntion.
     llvm::StringRef Callee;
@@ -119,11 +152,16 @@ private:
 /// \brief Explicit showing the AST refer to a variable
 /// given the symbol, DeclRef found the latest definition in LLVM IR SSA form.
 class DeclRefStmt : public ExprStmt {
+    uint8_t SubClassID;
 public:
     DeclRefStmt() = delete;
     DeclRefStmt(llvm::StringRef symbol);
     llvm::Value *CodeGen() override;
     TypeInfo *getType() override;
+
+    static bool classof(Stmt *S) {
+        return S->getStmtID() == Stmt::kDeclRefStmt;
+    }
 private:
     Stmt *decl;
     llvm::StringRef symbol;
@@ -140,6 +178,10 @@ public:
     /// \brief Get the type of array subscription like 
     /// \example for int A[]; A[4] is a 'int'.
     TypeInfo *getType() override;
+
+    static bool classof(Stmt *S) {
+        return S->getStmtID() == Stmt::kArraySubscriptStmt;
+    }
 private:
     ExprStmt *base, *idx;
 };
@@ -147,9 +189,17 @@ private:
 
 /// \brief Return statement; `return;` for void function or
 /// `return xxx;` for non-void function.
-class ReturnStmt : public ExprStmt {
+class ReturnStmt : public Stmt {
+    uint8_t SubClassID { Stmt::kReturnStmt };
 public:
+    /// \brief Return expression, nullptr for void;
     ReturnStmt(ExprStmt * ReturnExpr);
+
+public:
+    static bool classof(Stmt *S) {
+        return S->getStmtID() == Stmt::kReturnStmt;
+    }
+
 private:
     ExprStmt *value;
 };
@@ -157,9 +207,10 @@ private:
 
 /// \brief Binary operations like plus, minus in AST.
 class BinaryOperator : public ExprStmt {
+    uint8_t SubClassID { Stmt::kBinaryOperator };
 public:
     /// \brief Binary Operator varieties
-    enum BinaryOpcode : uint32_t {
+    enum BinaryOpcode : uint8_t {
         Uknown,
     #define BINARY_OPERATOR(X) X,
     #include "Expression.def"
@@ -175,6 +226,9 @@ public:
     uint32_t getOpcode() const { return Opcode; }
     llvm::Value *CodeGen() override;
     TypeInfo *getType() override;
+    static bool classof(const Stmt *S) {
+        return S->getStmtID() == Stmt::kBinaryOperator;
+    }
 protected:
     llvm::Value *Operands[2];
     Stmt *SubExprs[2];
@@ -184,6 +238,7 @@ protected:
 
 /// \brief Integer literals in AST.
 class IntegerLiteral : public ExprStmt {
+    uint8_t SubClassID { Stmt::kIntegerLiteral };
 public:
     IntegerLiteral() = delete;
     /// \brief Use integer variable to construct a IntegerLiteral
@@ -195,6 +250,9 @@ public:
     uint64_t getVal();
     llvm::Value *CodeGen() override;
     TypeInfo *getType() override;
+    static bool classof(const Stmt *S) {
+        return S->getStmtID() == Stmt::kIntegerLiteral;
+    } 
 protected:
     llvm::APInt Value;
     llvm::IntegerType *Type;
@@ -203,6 +261,7 @@ protected:
 
 /// \brief floating point number literals in AST.
 class FloatingLiteral : public ExprStmt {
+    uint8_t SubClassID { Stmt::kFloatingLiteral };
 public:
     FloatingLiteral() = delete;
     // Constructor of double literal.
@@ -212,6 +271,9 @@ public:
 public:
     llvm::Value *CodeGen() override;
     TypeInfo *getType() override;
+    static bool classof(const Stmt *S) {
+        return S->getStmtID() == Stmt::kFloatingLiteral;
+    }
 protected:
     // llvm::APFloat support convertXXX for casting.
     // llvm::IEEEFloat also works

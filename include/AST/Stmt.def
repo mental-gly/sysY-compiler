@@ -1,0 +1,32 @@
+#ifndef HANDLE_AST_STMT
+#define HANDLE_AST_STMT(X) X 
+#endif 
+#ifndef HANDLE_AST_STMT_EXPR 
+#define HANDLE_AST_STMT_EXPR(X) X
+#endif 
+
+
+
+
+
+// statement
+HANDLE_AST_STMT(CompoundStmt)
+HANDLE_AST_STMT(DeclStmt)
+HANDLE_AST_STMT(IfStmt)
+HANDLE_AST_STMT(ForStmt)
+HANDLE_AST_STMT(WhileStmt)
+HANDLE_AST_STMT(ExprStmt)
+HANDLE_AST_STMT(ReturnStmt)
+
+// expression
+HANDLE_AST_STMT_EXPR(CallStmt)
+HANDLE_AST_STMT_EXPR(ArraySubscriptStmt)
+HANDLE_AST_STMT_EXPR(DeclRefStmt)
+HANDLE_AST_STMT_EXPR(BinaryOperator)
+HANDLE_AST_STMT_EXPR(IntegerLiteral)
+HANDLE_AST_STMT_EXPR(FloatingLiteral)
+
+
+#undef HANDLE_AST_STMT
+
+#undef HANDLE_AST_STMT_EXPR

@@ -18,38 +18,37 @@
 
 class Stmt;
 class ExprStmt;
+class DeclStmt;
 
 /// \brief C-family declarations
 class Decl {
+    uint8_t SubClassID;
 public:
     Decl() = default;
-    Decl(uint32_t K, llvm::StringRef name) 
-        : Kind(K), name(name) { }
+    Decl(llvm::StringRef name) 
+        : name(name) { }
 public:
-    enum : uint32_t {
+    enum DeclTy : uint8_t {
         kUnkown,
-        kFunctionDecl,
-        kVarDecl,
-        kParamDecl,
-        kTypedecl, // typedef 
+    #define HANDLE_AST_DECL(X) k##X, 
+    #include "AST/Decl.def"
         NUM_DECL
     };
 public:
-    uint32_t getKind() const { return Kind; }
+    unsigned getDeclID() const { return SubClassID; }
     llvm::StringRef getName() const { return name; }
-    TypeInfo *getType() const { return type; }
 protected:
-    uint32_t Kind {kUnkown};
     llvm::StringRef name;
 };
 
 /// \brief general variable declaration,
 /// Bison parser cannot get VarDecl type.
 class VarDecl : public Decl {
+    uint8_t SubClassID { Decl::kVarDecl };
 public:
     VarDecl() = default;
-    VarDecl(uint32_t K, llvm::StringRef name) 
-        : Decl(K, name) { }
+    VarDecl(llvm::StringRef name) 
+        : Decl(name) { }
 public:
     enum DefinitionKind : uint32_t {
         DeclarationOnly,
@@ -66,30 +65,61 @@ public:
     ExprStmt *getInit() const;
     void setInitStyle();
     DefinitionKind hasDefinition() const;
+    /// \brief Return the type of declaration;
+    /// if type is nullptr, means the bison parser
+    /// can not assign type immediately, and we require 
+    /// parent AST node to set type correctly.
     void getType();
-protected:
+
+    static bool classof(const Decl *D) {
+        return D->getDeclID() == Decl::kVarDecl;
+    }
+private:
     // initialize expression.
     ExprStmt *init_expr;
     TypeInfo *type {nullptr};
     enum DefinitionKind definition_kind;
     enum InitializationStyle initialization_style;
+protected:
+    /// \brief This method can be only called by friend class
+    /// to set type after Bison parser get type of declaration.
+    void setType(TypeInfo *T) {
+        type = T;
+    }
+    // friend classes.
+    friend class ExprStmt;
+    friend class DeclStmt;
 };
 
 /// \brief Function parameter declaration.
 class ParamDecl : public VarDecl {
+    uint8_t SubClassID { Decl::kParamDecl };
 public:
     ParamDecl() = default;
-    ParamDecl(uint32_t K, TypeInfo *T, llvm::StringRef name) 
-        : VarDecl(K, T, name) { }
+    ParamDecl(TypeInfo *T, llvm::StringRef name) 
+        : VarDecl(name) 
+    {
+        VarDecl::setType(T);
+    }
+    // getType() public inherit from VarDecl::getType().
+
+    static bool classof(const Decl *D) {
+        return D->getDeclID() == Decl::kParamDecl;
+    }
+
 };
 
 
 /// \brief Function declaration.
 class FunctionDecl : public Decl {
+    uint8_t SubClassID { Decl::kFunctionDecl };
 public:
     FunctionDecl() = default;
-    FunctionDecl(uint32_t K, TypeInfo *T, llvm::StringRef name) 
-        : Decl(K, T, name) { }
+    FunctionDecl(TypeInfo *T, llvm::StringRef name) 
+        : Decl(name) 
+    {
+        return_type = T;
+    }
 public:
     // constructors
     FunctionDecl() = delete;
@@ -107,6 +137,10 @@ public:
     ParamDecl *getParams() const;
 
     llvm::Function* CodeGen();
+
+    static bool classof(const Decl *D) {
+        return D->getDeclID() == Decl::kFunctionDecl;
+    }
 private:
     llvm::SmallVector<ParamDecl *, 10> param_list;
     // The body is usually a {} braced `CompoundStmt`.

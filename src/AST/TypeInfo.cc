@@ -5,7 +5,8 @@ std::vector<TypeInfo> TypeContext::type_table;
 
 void TypeContext::Init(){
     // special type
-    TypeContext::type_table.emplace_back("void", 0, TypeInfo::kVoid);
+    TypeContext::type_table.emplace_back(
+        std::hash<std::string>()("void"), 0, TypeInfo::kVoid);
     // register primitive numeric types
     REGISTER_NUMERIC(float);   
     REGISTER_NUMERIC(double);
@@ -48,7 +49,7 @@ TypeInfo *TypeContext::find(const std::string &name_key) {
 }
 
 TypeInfo *TypeContext::createNumericType(const std::string &name_key, size_t size) {
-    auto type = find(name);
+    auto type = find(name_key);
     if (type != nullptr) return type;
     type_table.emplace_back(std::hash<std::string>()(name_key), 
                             size, TypeInfo::kNumeric);
@@ -77,8 +78,8 @@ TypeInfo *TypeContext::createArrayType(const std::string &name_key, size_t Lengt
     if (type != nullptr) return type;
     auto base_type = find(name_key);
     CHECK(base_type) << "Unknown type " << name_key;
-    type_table.emplace_back(std::hash<std::string>(ArrayOs.str()),
-                            size(base_type->ByteSize * Length), TypeInfo);
+    type_table.emplace_back(std::hash<std::string>()(ArrayOs.str()),
+                            sizeof(base_type->ByteSize * Length), TypeInfo::kArrays);
     auto new_type = &type_table.back();
     new_type->Use[0] = base_type;
     return new_type;

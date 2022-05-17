@@ -10,14 +10,16 @@
 
 %parse-param { std::unique_ptr<Stmt> &stmt }
 %type <stmt> DeclStmt CompoundStmt ExprStmt CallStmt DeclRef ArraySubscript BinaryOperator IntegerLiteral FloatingLiteral
-%token T_CHAR T_INT T_STRING T_BOOL T_VOID
+token T_CHAR T_INT T_STRING T_BOOL T_VOID
 %token COMMA SEMICOLON OPENPAREN CLOSEPAREN OPENBRACE CLOSEBRACE OPENBRACKET CLOSEBRACKET
 %token ADDR
+%token MOD BIAND BIOR NOT VOID
 %token ASSIGN PLUSASSIGN MINUSASSIGN MULASSIGN DIVASSIGN
-%token CONST IF_ ELSE WHILE_ FOR_ BREAK CONTINUE RETURN
+%token CONST IF ELSE WHILE FOR_ BREAK CONTINUE RETURN
 %token EQ GRAEQ LESEQ NEQ GRA LES
-%token IDENTIFIER CHAR INTEGER STRING BOOL
-%token IF ELSE
+%token CHAR INTEGER STRING BOOLEAN
+%token <int_val> INT_CONST
+%token <str_val> IDENTIFIER 
 
 %left EQ
 %left OR XOR AND
@@ -25,11 +27,20 @@
 %left MUL DIV
 
 %%
+Program
+: CompileUnit{
+    ast = unique_ptr<string>($1);
+}
 
 CompileUnit
-: FunctionDecl{
-    auto comp_unit = new CompileUnit();
-    $$ = comp_unit;
+: CompileUnit FunctionDecl{
+    auto unit = unique_ptr<string>($1);
+    auto func_decl = unique_ptr<string>($2);
+    $$ = new string(*unit + *func_decl);
+}
+| FunctionDecl{
+    auto func_decl = unique_ptr<string>($1);
+    $$ = new string(*func_decl);
 }
 ;
 
@@ -39,7 +50,7 @@ FunctionDecl
     auto func_decl = new FunctionDecl(type, $4);
     $$ = func_decl;
 } 
-| basicType IDENTIFIER OPENBRACE Paramlist CLOSEBRACE SEMICOLON{
+| basicType IDENTIFIER OPENPAREN Paramlist CLOSEPAREN SEMICOLON{
     TypeInfo *type = TypeContext::find($1);
     auto func_decl = new FunctionDecl(type, $4);
     $$ = func_decl; 
@@ -47,7 +58,7 @@ FunctionDecl
 ;
 
 ParamList
-: ParamDecl{
+: | ParamDecl{
     auto param_list = new ParamList();
     param_list -> ?($1);//link funtion
     $$ = param_list; 
@@ -77,6 +88,10 @@ CompoundStmt
     $$ -> CreateSubStmt($2);
 }
 | CompoundStmt IfStmt{
+    $$ = $1;
+    $$ -> CreateSubStmt($2);
+}
+| CompoundStmt ReturnStmt{
     $$ = $1;
     $$ -> CreateSubStmt($2);
 }
@@ -145,26 +160,6 @@ DeclStmt
 }
 ;
 
-LiteralList
-: IntegerLiteral{
-    auto lit_list = new LiteralList();
-    lit_list -> ?() = $1; //link
-    $$ = lit_list;
-}
-| LiteralList COMMA IntegerLiteral{
-    $$ = $1;
-    $$ -> ?() = $3;
-}
-| FloatingLiteral{
-    auto lit_list = new LiteralList();
-    lit_list -> ?() = $1;
-    $$ = lit_list;
-}
-| LiteralList COMMA FloatingLiteral{
-    $$ = $1;
-    $$ -> ?() = $3;
-}
-;
 
 ExprStmt
 : DeclRefStmt ASSIGN ExprStmt {
@@ -227,45 +222,12 @@ ExprStmt
     auto _div = new BinaryOperator(BinaryOperator::UDiv, $1, $3);
     $$ = _div;
 }
-| FloatingLiteral OR ExprStmt{
-    auto _or = new BinaryOperator(BinaryOperator::Or, $1, $3);
-    $$ = _or;
-}  
-| FloatingLiteral XOR ExprStmt{
-    auto _xor = new BinaryOperator(BinaryOperator::Xor, $1, $3);
-    $$ = _xor;
-}
-| FloatingLiteral AND ExprStmt{
-    auto _and = new BinaryOperator(BinaryOperator::And, $1, $3);
-    $$ = _and;
-}
-| FloatingLiteral PLUS ExprStmt{
-    auto _plus = new BinaryOperator(BinaryOperator::Add, $1, $3);
-    $$ = _plus;
-}
-| FloatingLiteral MINUS ExprStmt{
-    auto _minus = new BinaryOperator(BinaryOperator::Sub, $1, $3);
-    $$ = _minus;
-}
-| FloatingLiteral MUL ExprStmt{
-    auto _mul = new BinaryOperator(BinaryOperator::Mul, $1, $3);
-    $$ = _mul;
-}
-| FloatingLiteral DIV ExprStmt{
-    auto _div = new BinaryOperator(BinaryOperator::UDiv, $1, $3);
-    $$ = _div;
-}
 | DeclRefStmt {
     auto expr_stmt = new ExprStmt();
     $$ -> ?() = $1; //要把exprstmt和declrestmt找关系连起来,下面三个同理
     $$ = expr_stmt;
 }
 | IntegerLiteral {
-    auto expr_stmt = new ExprStmt();
-    $$ -> ?() = $1;
-    $$ = expr_stmt;
-}
-| FloatingLiteral {
     auto expr_stmt = new ExprStmt();
     $$ -> ?() = $1;
     $$ = expr_stmt;
@@ -281,6 +243,12 @@ CallStmt
 : IDENTIFIER OPENPAREN ?ExprStmtList CLOSEPAREN SEMICOLON {
     auto call_stmt = new CallStmt($1, $3);
     $$ = call_stmt;
+}
+;
+
+IntegerLiteral
+: INT_CONST {
+    $$ = new string(to_string($1));
 }
 ;
 
@@ -327,17 +295,17 @@ ReturnStmt
 ;
 
 basicType
-: T_INT {
-    $$->type = TYPE_INT;
+: INTEGER {
+    $$ = new string("int");
 }
-| T_CHAR {
-    $$->type = TYPE_CHAR;
+| CHAR {
+    $$ = new string("char");
 }
-| T_BOOL {
-    $$->type = TYPE_BOOL;
+| BOOLEAN {
+    $$ = new string("bool");
 }
-| T_VOID {
-    $$->type = TYPE_VOID;
+| VOID {
+    $$ = new string("void");
 }
 ;
 

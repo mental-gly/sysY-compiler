@@ -1,6 +1,5 @@
 %{
-    int yylex();
-    int yyerror();
+    int yyerror(char* s);
     #include "decl.h"
 %}
 
@@ -341,3 +340,7 @@ basicType
     $$->type = TYPE_VOID;
 }
 ;
+
+void yyerror(char* s){
+    fprintf(stderr,"%s\n",s);
+}

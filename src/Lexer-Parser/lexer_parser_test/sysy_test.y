@@ -24,7 +24,7 @@ using namespace std;
   int int_val;
 }
 
-%type <str_val> FunctionDecl basicType CompoundStmt ParamList ParamDecl DeclStmt IdentifierList ReturnStmt ExprStmt DeclRefStmt IntegerLiteral CallStmt ExprStmtList CompileUnit Program 
+%type <str_val> FunctionDecl basicType CompoundStmt ParamList ParamDecl DeclStmt IdentifierList ReturnStmt ExprStmt DeclRefStmt IntegerLiteral CallStmt ExprStmtList CompileUnit Program IfStmt MatchedStmt UnmatchedStmt WhileStmt
 %token T_CHAR T_INT T_STRING T_BOOL T_VOID
 %token COMMA SEMICOLON OPENPAREN CLOSEPAREN OPENBRACE CLOSEBRACE OPENBRACKET CLOSEBRACKET
 %token ADDR
@@ -76,7 +76,10 @@ FunctionDecl
 ;
 
 ParamList
-: | ParamDecl{
+: {
+    $$ = new string("");  
+}
+| ParamDecl{
     auto param_decl = unique_ptr<string>($1);
     $$ = new string(*param_decl);  
 }
@@ -129,6 +132,24 @@ CompoundStmt
     auto ret_stmt = unique_ptr<string>($1);
     $$ = new string(*ret_stmt);
 }
+| CompoundStmt IfStmt {
+    auto comp_stmt = unique_ptr<string>($1);
+    auto if_stmt = unique_ptr<string>($2);
+    $$ = new string(*comp_stmt + *if_stmt);  
+}
+| IfStmt {
+    auto if_stmt = unique_ptr<string>($1);
+    $$ = new string(*if_stmt);
+}
+| CompoundStmt WhileStmt {
+    auto comp_stmt = unique_ptr<string>($1);
+    auto while_stmt = unique_ptr<string>($2);
+    $$ = new string(*comp_stmt + *while_stmt);  
+}
+| WhileStmt {
+    auto while_stmt = unique_ptr<string>($1);
+    $$ = new string(*while_stmt);
+}
 | CompoundStmt ExprStmt SEMICOLON{
     auto comp_stmt = unique_ptr<string>($1);
     auto expr_stmt = unique_ptr<string>($2);
@@ -140,10 +161,58 @@ CompoundStmt
 }
 ;
 
-ReturnStmt:
-| RETURN IntegerLiteral SEMICOLON {
-    auto number = unique_ptr<string>($2);
-    $$ = new string("return " + *number + ";");
+ReturnStmt
+: RETURN SEMICOLON {
+    $$ = new string("return;");
+}
+| RETURN ExprStmt SEMICOLON {
+    auto expr_stmt = unique_ptr<string>($2);
+    $$ = new string("return " + *expr_stmt + ";");
+}
+;
+
+IfStmt
+: MatchedStmt{
+    auto match_stmt = unique_ptr<string>($1);
+    $$ = new string(*match_stmt);
+}
+| UnmatchedStmt{
+    auto unmatch_stmt = unique_ptr<string>($1);
+    $$ = new string(*unmatch_stmt);
+}
+;
+
+WhileStmt
+: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmt{
+    auto expr_stmt = unique_ptr<string>($3);
+    auto comp_stmt = unique_ptr<string>($5);
+    $$ = new string("while(" + *expr_stmt + ")" + *comp_stmt);
+}
+
+MatchedStmt
+: IF OPENPAREN ExprStmt CLOSEPAREN MatchedStmt ELSE MatchedStmt{
+    auto expr_stmt = unique_ptr<string>($3);
+    auto match_stmt = unique_ptr<string>($5);
+    auto smatch_stmt = unique_ptr<string>($7);
+    $$ = new string("if(" + *expr_stmt + ")" + *match_stmt + "else" + *smatch_stmt);
+}
+| OPENBRACE CompoundStmt CLOSEBRACE{
+    auto comp_stmt = unique_ptr<string>($2);
+    $$ = new string("{" + *comp_stmt + "}");
+}
+;
+
+UnmatchedStmt
+: IF OPENPAREN ExprStmt CLOSEPAREN IfStmt{
+    auto expr_stmt = unique_ptr<string>($3);
+    auto if_stmt = unique_ptr<string>($5);
+    $$ = new string("if(" + *expr_stmt + ")" + *if_stmt);
+}
+| IF OPENPAREN ExprStmt CLOSEPAREN MatchedStmt ELSE UnmatchedStmt{
+    auto expr_stmt = unique_ptr<string>($3);
+    auto match_stmt = unique_ptr<string>($5);
+    auto unmatch_stmt = unique_ptr<string>($7);
+    $$ = new string("if(" + *expr_stmt + ")" + *match_stmt + "else" + *unmatch_stmt);
 }
 ;
 
@@ -202,6 +271,36 @@ ExprStmt
     auto expr_stmt = unique_ptr<string>($3);
     $$ = new string(*ref_stmt + "/" + *expr_stmt);
 }
+| DeclRefStmt EQ ExprStmt{
+    auto ref_stmt = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*ref_stmt + "==" + *expr_stmt);
+}
+| DeclRefStmt NEQ ExprStmt{
+    auto ref_stmt = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*ref_stmt + "!=" + *expr_stmt);
+}
+| DeclRefStmt GRA ExprStmt{
+    auto ref_stmt = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*ref_stmt + ">" + *expr_stmt);
+}
+| DeclRefStmt LES ExprStmt{
+    auto ref_stmt = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*ref_stmt + "<" + *expr_stmt);
+}
+| DeclRefStmt GRAEQ ExprStmt{
+    auto ref_stmt = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*ref_stmt + ">=" + *expr_stmt);
+}
+| DeclRefStmt LESEQ ExprStmt{
+    auto ref_stmt = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*ref_stmt + "<=" + *expr_stmt);
+}
 | IntegerLiteral OR ExprStmt{
     auto int_li = unique_ptr<string>($1);
     auto expr_stmt = unique_ptr<string>($3);
@@ -236,6 +335,36 @@ ExprStmt
     auto int_li = unique_ptr<string>($1);
     auto expr_stmt = unique_ptr<string>($3);
     $$ = new string(*int_li + "/" + *expr_stmt);
+}
+| IntegerLiteral EQ ExprStmt{
+    auto int_li = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*int_li + "==" + *expr_stmt);
+}
+| IntegerLiteral NEQ ExprStmt{
+    auto int_li = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*int_li + "!=" + *expr_stmt);
+}
+| IntegerLiteral GRA ExprStmt{
+    auto int_li = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*int_li + ">" + *expr_stmt);
+}
+| IntegerLiteral LES ExprStmt{
+    auto int_li = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*int_li + "<" + *expr_stmt);
+}
+| IntegerLiteral GRAEQ ExprStmt{
+    auto int_li = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*int_li + ">=" + *expr_stmt);
+}
+| IntegerLiteral LESEQ ExprStmt{
+    auto int_li = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*int_li + "<=" + *expr_stmt);
 }
 | DeclRefStmt {
     auto ref_stmt = unique_ptr<string>($1);

@@ -1,5 +1,5 @@
-#ifndef SYMBOLTABLE_H
-#define SYMBOLTABLE_H
+#ifndef COMPILER_SYMBOLTABLE_H
+#define COMPILER_SYMBOLTABLE_H
 
 /// \file SymbolTable.h
 /// \brief Symbol Table lookup Value by name
@@ -44,7 +44,7 @@ public:
     }
     /// \brief Leave current scope.
     void LeaveScope() {
-        CHECK_GT(ScopeValueMapList.size() ,1) << "Cannot leave global scope!";
+        CHECK_GT(ScopeValueMapList.size() ,1UL) << "Cannot leave global scope!";
         ScopeValueMapList.erase(ScopeValueMapList.begin());      
     }
 
@@ -69,10 +69,14 @@ public:
         LOG(FATAL) << "Undeclared symbol " << symbol.str();
         return EntryType();
     }
+
+    EntryType &operator[](llvm::StringRef Key) {
+        return (*begin())->operator[](Key);
+    }
 private:
     ScopeListType ScopeValueMapList;
 };
 
 
 
-#endif // SYMBOLTABLE_H
+#endif // COMPILER_SYMBOLTABLE_H

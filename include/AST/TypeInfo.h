@@ -3,6 +3,7 @@
 
 /// \file TypeInfo.h
 /// \brief TypeInfo class describe type equivalence
+#include "llvm/IR/Type.h"
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -23,7 +24,7 @@ struct TypeInfo {
 
     /// \todo set type use
     enum : uint32_t {
-        kUnkown,
+        kUnknown,
         kVoid,
         kNumeric,
         kPointer,
@@ -40,8 +41,10 @@ struct TypeInfo {
     uint32_t Kind;
     // struct type member variable types
     // If this type is defined with typedef (kAlias), parent is the original type.
-    // IF this type is a pointer (kPointer), parent is the dereferenced class. 
-    TypeInfo **Use {nullptr}; 
+    // IF this type is a pointer (kPointer), parent is the de-reference class.
+    TypeInfo **Use {nullptr};
+    // corresponding LLVM IR type.
+    llvm::Type *Type;
 };
 
 
@@ -50,7 +53,7 @@ class TypeContext {
 public:
     /// \brief register primitive types.
     static void Init();
-    static bool checkEquivalance(TypeInfo *Src, TypeInfo *Tgt); 
+    static bool checkEquivalence(TypeInfo *Src, TypeInfo *Tgt);
 
     static TypeInfo *find(const std::string &name_key);
 
@@ -60,7 +63,7 @@ public:
     /// \brief register pointer type \p T* given type name \p T.
     static TypeInfo *createPointerType(const std::string &name_key);
 
-    /// \brief register arraytype \p T[] given type name \p T. 
+    /// \brief register array type \p T[] given type name \p T.
     static TypeInfo *createArrayType(const std::string &name_key, size_t length);
 
     [[maybe_unused]] static TypeInfo &createStructType(const std::string &name_key, const std::vector<TypeInfo *> members) {

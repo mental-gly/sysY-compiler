@@ -1,5 +1,5 @@
-#ifndef DECL_H
-#define DECL_H
+#ifndef COMPILER_DECL_H
+#define COMPILER_DECL_H
 
 /// \file Decl.h
 /// \brief AST declaration node
@@ -13,41 +13,66 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Value.h>
-#include "TypeInfo.h"
+#include <llvm/IR/IRBuilder.h>
+#include "ADT/ilist.h"
+#include "AST/TypeInfo.h"
+#include "AST/SymbolTable.h"
+#include "AST/Stmt.h"
 
-
-class Stmt;
-class ExprStmt;
-class DeclStmt;
 
 /// \brief C-family declarations
-class Decl {
+class Decl : public ast_ilist_node<Decl> {
     uint8_t SubClassID;
 public:
     Decl() = default;
-    Decl(llvm::StringRef name) 
-        : name(name) { }
+    Decl(const std::string &name)
+        : Name(name) { }
 public:
     enum DeclTy : uint8_t {
-        kUnkown,
+        kUnknown,
     #define HANDLE_AST_DECL(X) k##X, 
     #include "AST/Decl.def"
         NUM_DECL
     };
 public:
     unsigned getDeclID() const { return SubClassID; }
-    llvm::StringRef getName() const { return name; }
+    llvm::StringRef getName() const { return Name; }
 protected:
-    llvm::StringRef name;
+    const std::string &Name;
 };
+
+
+/// \brief CompileUnit is a helper collect global
+/// declarations and build LLVM IR.
+class CompileUnitDecl final : public Decl {
+    uint8_t SubClassID { Decl::kCompileUnitDecl };
+public:
+    CompileUnitDecl() = delete;
+    /// \brief We expect a compile unit is composed of
+    /// a list of declarations; nullptr if there is no
+    /// declarations
+    CompileUnitDecl(Decl *DeList, const std::string &FileName);
+public:
+    /// \brief Dump the CompileUnit into stderr.
+    void print() const { Module->print(llvm::outs(), nullptr); };
+public:
+    llvm::SmallVector<Decl *, 10> Decls;
+    std::unique_ptr<llvm::LLVMContext> Context;
+    std::unique_ptr<llvm::IRBuilder<>> Builder;
+    std::unique_ptr<llvm::Module> Module;
+    SymbolTable<llvm::Value *> Symbol;
+};
+
 
 /// \brief general variable declaration,
 /// Bison parser cannot get VarDecl type.
+///
+/// multi-inherit to let VarDecl linked together.
 class VarDecl : public Decl {
     uint8_t SubClassID { Decl::kVarDecl };
 public:
     VarDecl() = default;
-    VarDecl(llvm::StringRef name) 
+    VarDecl(const std::string &name)
         : Decl(name) { }
 public:
     enum DefinitionKind : uint32_t {
@@ -61,15 +86,24 @@ public:
     };
 public:
     // set init expression
-    void setInit(ExprStmt *);
-    ExprStmt *getInit() const;
-    void setInitStyle();
-    DefinitionKind hasDefinition() const;
+    void setInit(ExprStmt *Init) { init_expr = Init; }
+    // get init expression
+    ExprStmt *getInit() const { return init_expr; }
+    void setInitStyle(enum InitializationStyle InitStyle) {
+        initialization_style = InitStyle;
+    }
+    enum InitializationStyle getInitStyle() const {
+        return initialization_style;
+    }
     /// \brief Return the type of declaration;
     /// if type is nullptr, means the bison parser
     /// can not assign type immediately, and we require 
     /// parent AST node to set type correctly.
-    void getType();
+    TypeInfo *getType() const { return type; }
+
+    /// \brief Allocate space for Local variable or
+    /// declare global variable
+    llvm::Value *CodeGen(CompileUnitDecl *);
 
     static bool classof(const Decl *D) {
         return D->getDeclID() == Decl::kVarDecl;
@@ -96,7 +130,7 @@ class ParamDecl : public VarDecl {
     uint8_t SubClassID { Decl::kParamDecl };
 public:
     ParamDecl() = default;
-    ParamDecl(TypeInfo *T, llvm::StringRef name) 
+    ParamDecl(TypeInfo *T, const std::string &name)
         : VarDecl(name) 
     {
         VarDecl::setType(T);
@@ -111,41 +145,39 @@ public:
 
 
 /// \brief Function declaration.
-class FunctionDecl : public Decl {
+class FunctionDecl final : public Decl {
     uint8_t SubClassID { Decl::kFunctionDecl };
-public:
-    FunctionDecl() = default;
-    FunctionDecl(TypeInfo *T, llvm::StringRef name) 
-        : Decl(name) 
-    {
-        return_type = T;
-    }
 public:
     // constructors
     FunctionDecl() = delete;
     /// \brief declare a function returns a value of \p return_type with no param.
-    FunctionDecl(TypeInfo *return_type);
+    FunctionDecl(TypeInfo *return_type, const std::string &name)
+        : Decl(name) { ReturnType = return_type; }
     /// \brief declare a function returns a value of \p return_type with parameters of \p params.
-    FunctionDecl(TypeInfo *return_type, llvm::SmallVectorImpl<ParamDecl*> params);
+    FunctionDecl(TypeInfo *return_type, const std::string &name, ParamDecl *ParaList);
 public:
+    llvm::Function* CodeGen(CompileUnitDecl *);
     /// \brief Returns true if the function has a function definition body.
-    bool hasBody() const;
-    /// \brief Returns true if the function has somewhere a definiyion
-    bool hasDefiniton() const;
-    void setBody(Stmt *B);
-    TypeInfo *getReturnType() const;
-    ParamDecl *getParams() const;
+    bool hasBody() const { return Body != nullptr; }
+    void setBody(Stmt *B) { Body = B; }
+    /// \brief Returns true if the function has somewhere a definition
+    bool hasDefinition(CompileUnitDecl *) const;
+    TypeInfo *getReturnType() const {
+        return ReturnType;
+    }
 
-    llvm::Function* CodeGen();
+    llvm::SmallVectorImpl<ParamDecl *> &getParams() {
+        return Params;
+    }
 
     static bool classof(const Decl *D) {
         return D->getDeclID() == Decl::kFunctionDecl;
     }
 private:
-    llvm::SmallVector<ParamDecl *, 10> param_list;
+    llvm::SmallVector<ParamDecl *, 10> Params;
     // The body is usually a {} braced `CompoundStmt`.
     Stmt *Body;
-    TypeInfo *return_type;
+    TypeInfo *ReturnType;
 };
 
-#endif
+#endif // COMPILER_DECL_H

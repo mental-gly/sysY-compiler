@@ -37,6 +37,10 @@ int main() {
     Value *RetVal = ConstantInt::getSigned(RetT, 0);
     builder->CreateRet(RetVal);
     builder->CreateRet(nullptr);
+    AllocaInst *Addr = builder->CreateAlloca(Type::getInt32PtrTy(*context));
+    LoadInst *LoadPtr = builder->CreateLoad(Type::getInt32PtrTy(*context), Addr);
+    Value *NullPtr = ConstantPointerNull::get(Type::getInt32PtrTy(*context));
+    Value *Cond = builder->CreateICmpNE(LoadPtr, NullPtr);
     auto SymbolTable = Func->getValueSymbolTable();
     LOG(INFO) << "Dump module";
     module->print(outs(), nullptr);

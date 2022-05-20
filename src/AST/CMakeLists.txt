@@ -1,6 +1,6 @@
 llvm_map_components_to_libnames(LLVM_LIBS
-    support core 
-    asmprinter selectiondag codegen target mc)
+    support core
+)
 
 set(AST_SOURCES
         TypeInfo.cc

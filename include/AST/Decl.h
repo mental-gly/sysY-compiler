@@ -53,8 +53,9 @@ public:
     /// declarations
     CompileUnitDecl(Decl *DeList, const std::string &FileName);
 public:
-    /// \brief Dump the CompileUnit into stderr.
+    /// \brief Dump the CompileUnit.
     void print() const { Module->print(llvm::outs(), nullptr); };
+    void CodeGen();
 public:
     llvm::SmallVector<Decl *, 10> Decls;
     std::unique_ptr<llvm::LLVMContext> Context;

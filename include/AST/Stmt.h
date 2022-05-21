@@ -126,6 +126,20 @@ private:
 };
 
 
+class WhileStmt : public Stmt {
+    uint8_t  SubClassID { Stmt::kWhileStmt };
+public:
+    WhileStmt() = delete;
+    WhileStmt(ExprStmt *Cond, Stmt *Body = nullptr);
+public:
+    bool hasBody() const { return Body != nullptr; }
+    void setBody(Stmt *B) { Body = B; }
+    llvm::Value *CodeGen(CompileUnitDecl *) override;
+private:
+    ExprStmt *Cond;
+    Stmt *Body;
+};
+
 class ForStmt : public Stmt {
     uint8_t SubClassID { Stmt::kForStmt };
 public:
@@ -151,7 +165,7 @@ public:
     };
 public:
     ExprStmt() = default;
-    ExprStmt(enum ExprValueKind VK, TypeInfo *T = nullptr) {
+    explicit ExprStmt(enum ExprValueKind VK, TypeInfo *T = nullptr) {
         ValueKind = VK;
         ExprType = T;
     }

@@ -58,35 +58,40 @@ IfStmt::IfStmt(ExprStmt *Cond, Stmt *Then, Stmt *Else)
         LOG(WARNING) << "Empty statement body.";
 }
 
+static Value *doCompare(IRBuilder<> *builder, Value *CondV) {
+    // If integer number, compare with 0.
+    if (CondV->getType()->isIntegerTy()) {
+        return builder->
+                CreateICmpNE(CondV,
+                             ConstantInt::get(CondV->getType(), 0),
+                             "cond");
+    }
+        // If floating number, compare with 0.0.
+    else if (CondV->getType()->isFloatTy()) {
+        return builder->
+                CreateFCmpONE(CondV,
+                              ConstantFP::get(CondV->getType(), 0.0),
+                              "cond");
+    }
+        // If pointer type, compare with null.
+    else if (CondV->getType()->isPointerTy()) {
+        return builder->
+                CreateICmpNE(CondV,
+                             ConstantPointerNull::get(
+                                     dyn_cast<PointerType>(CondV->getType())),
+                             "cond");
+    }
+    return nullptr;
+}
+
+
 Value *IfStmt::CodeGen(CompileUnitDecl *U) {
     auto builder = U->getBuilder();
     auto context = U->getContext();
     Value *CondV = Cond->CodeGen(U);
-    Value *LogicCondV;
     CHECK(CondV->getType()->isSingleValueType())
         << "Expect a scalar type in `if` condition";
-    // If integer number, compare with 0.
-    if (CondV->getType()->isIntegerTy()) {
-        LogicCondV = builder->
-                CreateICmpNE(CondV,
-                             ConstantInt::get(CondV->getType(), 0),
-                             "ifcond");
-    }
-    // If floating number, compare with 0.0.
-    else if (CondV->getType()->isFloatTy()) {
-        LogicCondV = builder->
-                CreateFCmpONE(CondV,
-                              ConstantFP::get(CondV->getType(), 0.0),
-                              "ifcond");
-    }
-    // If pointer type, compare with null.
-    else if (CondV->getType()->isPointerTy()) {
-        LogicCondV = builder->
-                CreateICmpNE(CondV,
-                             ConstantPointerNull::get(
-                                     dyn_cast<PointerType>(CondV->getType())),
-                             "ifcond");
-    }
+    Value *LogicCondV = doCompare(builder, CondV);
     // Optimization, neglect empty then block.
     if (Then != nullptr) {
         // Get the parent function.
@@ -100,6 +105,8 @@ Value *IfStmt::CodeGen(CompileUnitDecl *U) {
         builder->SetInsertPoint(ThenBB);
         Then->CodeGen(U);
         ThenBB = builder->GetInsertBlock();
+        /// \fixme : a better approach is dyn_cast<Instruction>()->isTerminator()
+        /// to repair all early branch problem.
         if (!isa<ReturnInst>(ThenBB->back())) builder->CreateBr(MergeBB);
         // Update Then block;
         // if then block generate multiple BB,
@@ -116,7 +123,41 @@ Value *IfStmt::CodeGen(CompileUnitDecl *U) {
     return nullptr;
 }
 
+//===-- WhileStmt --===//
+WhileStmt::WhileStmt(ExprStmt *Cond, Stmt *Body)
+    : Cond(Cond), Body(Body) { }
 
+llvm::Value *WhileStmt::CodeGen(CompileUnitDecl *U) {
+    auto builder = U->getBuilder();
+    auto context = U->getContext();
+    Value *CondV = Cond->CodeGen(U);
+    CHECK(CondV->getType()->isSingleValueType())
+        << "Expect a scalar type in `while` condition";
+    Value *LogicCondV = doCompare(builder, CondV);
+    // If while has body, gen the body.
+    if (hasBody()) {
+        // Get parent function.
+        auto F = builder->GetInsertBlock()->getParent();
+        auto CondBB = BasicBlock::Create(*context, "cond", F);
+        builder->CreateBr(CondBB);
+        auto BodyBB = BasicBlock::Create(*context, "wbody");
+        auto MergeBB = BasicBlock::Create(*context, "wmerge");
+        // Conditional branch.
+        builder->CreateCondBr(LogicCondV, BodyBB, MergeBB);
+        builder->SetInsertPoint(BodyBB);
+        Body->CodeGen(U);
+        BodyBB = builder->GetInsertBlock();
+        // At the end of body, jump back to While Cond.
+        builder->CreateBr(CondBB);
+        // Update Then block;
+        // if then block generate multiple BB,
+        // we should locate the ThenBB to the last basic block.
+        F->getBasicBlockList().push_back(BodyBB);
+        F->getBasicBlockList().push_back(MergeBB);
+        builder->SetInsertPoint(MergeBB);
+    }
+    return nullptr;
+}
 
 //===-- CallStmt --===//
 CallStmt::CallStmt(const std::string &Func, ExprStmt *ArgList)
@@ -223,6 +264,19 @@ TypeInfo *BinaryOperatorStmt::getType(CompileUnitDecl *U) {
     return nullptr;
 }
 
+static Value *doDiv(IRBuilder<> *builder, Value *LHS, Value *RHS, bool isSigned) {
+    // UDiv, SDiv, FDiv
+    if (LHS->getType()->isIntegerTy()) {
+        if (isSigned) return builder->CreateSDiv(LHS, RHS);
+        else return builder->CreateUDiv(LHS, RHS);
+    }
+    if (LHS->getType()->isFloatTy() || LHS->getType()->isDoubleTy()) {
+        return builder->CreateFDiv(LHS, RHS);
+    }
+    return nullptr;
+}
+
+
 static Value *doGreater(IRBuilder<> *builder, Value *LHS, Value *RHS, bool isSigned) {
     // We suppose after semantic analysis or carefully
     // write code, LHS and RHS has the same type.
@@ -308,6 +362,7 @@ Value *BinaryOperatorStmt::CodeGen(CompileUnitDecl *U) {
         case Add    :   return builder->CreateAdd(Operands[0], Operands[1]);
         case Sub    :   return builder->CreateSub(Operands[0], Operands[1]);
         case Mul    :   return builder->CreateMul(Operands[0], Operands[1]);
+        case Div    :   return doDiv(builder, Operands[0], Operands[1], isSigned);
         case Assign :   return builder->CreateStore(Operands[1], Operands[0]);
         case Greater :  return doGreater(builder, Operands[0], Operands[1], isSigned);
         case Less :     return doLess(builder, Operands[0], Operands[1], isSigned);

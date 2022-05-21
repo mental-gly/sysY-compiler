@@ -81,11 +81,19 @@ TypeInfo *TypeContext::createArrayType(const std::string &name_key, size_t Lengt
     ArrayOs << name_key << "[" << Length << "]";
     auto type = find(ArrayOs.str());
     if (type != nullptr) return type;
+    // register new type.
     auto base_type = find(name_key);
     CHECK(base_type) << "Unknown type " << name_key;
     type_table.emplace_back(std::hash<std::string>()(ArrayOs.str()),
                             sizeof(base_type->ByteSize * Length), TypeInfo::kArrays);
     auto new_type = &type_table.back();
     new_type->Use[0] = base_type;
+
+    if (Length > 0)
+        // A true array type.
+        SetLLVMType(new_type, ArrayType::get(base_type->Type, Length));
+    else
+        // A function parameter type, treat as pointer.
+        SetLLVMType(new_type, PointerType::get(base_type->Type, 0));
     return new_type;
 }

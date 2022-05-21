@@ -1,6 +1,10 @@
 #include "AST/Decl.h"
 #include "AST/TypeInfo.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/IR/ValueSymbolTable.h"
+#include "llvm/IR/InstIterator.h"
+#include "llvm/ADT/Twine.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 
 //===-- CompileUnit --===//
@@ -66,6 +70,22 @@ bool FunctionDecl::hasDefinition(CompileUnitDecl *U) const {
     return true;
 }
 
+/// \brief This helper function replace return instruction with stores;
+/// This is due to the problem a early return would implicitly create a new BB
+/// in LLVM IR.
+static void doRARWS(llvm::IRBuilder<> *builder, llvm::Function *F) {
+    auto RetName = llvm::Twine(F->getName(), "ret");
+    llvm::SmallVector<char, 10> Name;
+    auto RetValAddr = F->getValueSymbolTable()->lookup(RetName.toStringRef(Name));
+    // iterating over instructions in the Function.
+    for (auto I = llvm::inst_begin(F), E = llvm::inst_end(F); I != E; ++I) {
+        if (llvm::isa<llvm::ReturnInst>(&*I)) {
+            auto RetVal = llvm::dyn_cast<llvm::ReturnInst>(&*I);
+            auto Store = builder->CreateStore(RetVal->getOperand(0), RetValAddr);
+            I->replaceAllUsesWith(Store);
+        }
+    }
+}
 
 llvm::Function *FunctionDecl::CodeGen(CompileUnitDecl *U) {
     auto module = U->getModule();
@@ -118,6 +138,8 @@ llvm::Function *FunctionDecl::CodeGen(CompileUnitDecl *U) {
             }
             // Generate definition.
             Body->CodeGen(U);
+            // do Replace All Return With Store.
+            // doRARWS(builder, F);
             // deal with final ret,
             // if there is no ret, we add a final ret.
             if (!llvm::isa<llvm::ReturnInst>(F->getBasicBlockList().back().back())) {

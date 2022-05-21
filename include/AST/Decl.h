@@ -60,7 +60,7 @@ public:
     llvm::IRBuilder<> *getBuilder() const { return Builder.get(); }
     llvm::Module *getModule() const { return Module.get(); }
     /// \brief Dump the CompileUnit.
-    void print() const { Module->print(llvm::outs(), nullptr); };
+    void print() const;
     void CodeGen();
 
     SymbolTable<llvm::Value *> Symbol;

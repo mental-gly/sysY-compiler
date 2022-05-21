@@ -6,7 +6,6 @@
 ///
 /// Refer to Clang AST Stmt & Decl designs.
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/APFixedPoint.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/APSInt.h"

@@ -472,16 +472,3 @@ IdentifierList
 void yyerror(CompileUnitDecl& comp_unit, const char *s); {
   cerr << "error: " << s << endl;
 };
-
-int main() {
-  // 打开输入文件, 并且指定 lexer 在解析的时候读取这个文件
-  yyin = fopen("test.txt", "r");
-  assert(yyin);
-
-  // 调用 parser 函数, parser 函数会进一步调用 lexer 解析输入文件的
-  auto Unit = new CompileUnitDecl("If.c");
-  TypeContext::Init(Unit->getContext());
-  auto ret = yyparse(*Unit);
-  assert(!ret);
-  return 0;
-}

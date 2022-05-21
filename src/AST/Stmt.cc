@@ -238,6 +238,50 @@ static Value *doGreater(IRBuilder<> *builder, Value *LHS, Value *RHS, bool isSig
     return nullptr;
 }
 
+static Value *doLess(IRBuilder<> *builder, Value *LHS, Value *RHS, bool isSigned) {
+    // We suppose after semantic analysis or carefully
+    // write code, LHS and RHS has the same type.
+    if (LHS->getType()->isIntegerTy()) {
+        auto LType = dyn_cast<IntegerType>(LHS->getType());
+        auto RType = dyn_cast<IntegerType>(RHS->getType());
+        if (isSigned) return builder->CreateICmpSGT(LHS, RHS);
+        else return builder->CreateICmpULT(LHS, RHS);
+    }
+    if (LHS->getType()->isDoubleTy() || LHS->getType()->isFloatTy()) {
+        return builder->CreateFCmpOLE(LHS, RHS);
+    }
+    return nullptr;
+}
+
+static Value *doEqual(IRBuilder<> *builder, Value *LHS, Value *RHS) {
+    // We suppose after semantic analysis or carefully
+    // write code, LHS and RHS has the same type.
+    if (LHS->getType()->isIntegerTy()) {
+        auto LType = dyn_cast<IntegerType>(LHS->getType());
+        auto RType = dyn_cast<IntegerType>(RHS->getType());
+        return builder->CreateICmpEQ(LHS, RHS);
+    }
+    if (LHS->getType()->isDoubleTy() || LHS->getType()->isFloatTy()) {
+        return builder->CreateFCmpOEQ(LHS, RHS);
+    }
+    return nullptr;
+}
+
+static Value *doNEqual(IRBuilder<> *builder, Value *LHS, Value *RHS) {
+    // We suppose after semantic analysis or carefully
+    // write code, LHS and RHS has the same type.
+    if (LHS->getType()->isIntegerTy()) {
+        auto LType = dyn_cast<IntegerType>(LHS->getType());
+        auto RType = dyn_cast<IntegerType>(RHS->getType());
+        return builder->CreateICmpNE(LHS, RHS);
+    }
+    if (LHS->getType()->isDoubleTy() || LHS->getType()->isFloatTy()) {
+        return builder->CreateFCmpONE(LHS, RHS);
+    }
+    return nullptr;
+}
+
+
 Value *BinaryOperatorStmt::CodeGen(CompileUnitDecl *U) {
     auto builder = U->getBuilder();
     Operands[0] = SubExprs[0]->CodeGen(U);
@@ -265,7 +309,12 @@ Value *BinaryOperatorStmt::CodeGen(CompileUnitDecl *U) {
         case Sub    :   return builder->CreateSub(Operands[0], Operands[1]);
         case Mul    :   return builder->CreateMul(Operands[0], Operands[1]);
         case Assign :   return builder->CreateStore(Operands[1], Operands[0]);
-        case Greater : return doGreater(builder, Operands[0], Operands[1], isSigned);
+        case Greater :  return doGreater(builder, Operands[0], Operands[1], isSigned);
+        case Less :     return doLess(builder, Operands[0], Operands[1], isSigned);
+        case Equal :    return doEqual(builder, Operands[0], Operands[1]);
+        case NotEqual : return doNEqual(builder, Operands[0], Operands[1]);
+        default:
+            LOG(FATAL) << "Not Implemented binary operation";
     }
     return nullptr;
 }

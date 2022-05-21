@@ -1,27 +1,32 @@
 #include "AST/TypeInfo.h"
+#include "llvm/IR/DerivedTypes.h"
 #include <sstream>
+using namespace llvm;
 std::vector<TypeInfo> TypeContext::type_table;
+LLVMContext *TypeContext::context = nullptr;
 
-
-void TypeContext::Init(){
+void TypeContext::Init(LLVMContext *Context){
+    // Set LLVM Context.
+    context = Context;
     // special type
     TypeContext::type_table.emplace_back(
         std::hash<std::string>()("void"), 0, TypeInfo::kVoid);
+    SetLLVMType(&type_table.back(), Type::getVoidTy(*context));
     // register primitive numeric types
-    REGISTER_NUMERIC(float);   
-    REGISTER_NUMERIC(double);
-    REGISTER_NUMERIC(char);
-    REGISTER_NUMERIC(unsigned char);
-    REGISTER_NUMERIC(short);
-    REGISTER_NUMERIC(unsigned short);
-    REGISTER_NUMERIC(int);
-    REGISTER_NUMERIC(unsigned int);
-    REGISTER_NUMERIC(long long);
-    REGISTER_NUMERIC(unsigned long long);
+    SetLLVMType(REGISTER_NUMERIC(float),             Type::getFloatTy(*context));
+    SetLLVMType(REGISTER_NUMERIC(double),            Type::getDoubleTy(*context));
+    SetLLVMType(REGISTER_NUMERIC(char),              Type::getInt8Ty(*context));
+    SetLLVMType(REGISTER_NUMERIC(unsigned char),     Type::getInt8Ty(*context));
+    SetLLVMType(REGISTER_NUMERIC(short),             Type::getInt16Ty(*context));
+    SetLLVMType(REGISTER_NUMERIC(unsigned short),    Type::getInt16Ty(*context));
+    SetLLVMType(REGISTER_NUMERIC(int),               Type::getInt32Ty(*context));
+    SetLLVMType(REGISTER_NUMERIC(unsigned int),      Type::getInt32Ty(*context));
+    SetLLVMType(REGISTER_NUMERIC(long long),         Type::getInt64Ty(*context));
+    SetLLVMType(REGISTER_NUMERIC(unsigned long long),Type::getInt64Ty(*context));
 }
 
 
-bool TypeContext::checkEquivalance(TypeInfo *Src, TypeInfo *Tgt) {
+bool TypeContext::checkEquivalence(TypeInfo *Src, TypeInfo *Tgt) {
     switch (Src->Kind) {
         // primitive type 
         case TypeInfo::kNumeric:

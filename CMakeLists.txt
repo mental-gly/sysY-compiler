@@ -8,7 +8,7 @@ message(STATUS "CMake_HOST_SYSTEM_NAME ${CMAKE_HOST_SYSTEM_NAME}")
 message(STATUS "CMAKE_HOST_SYSTEM_VERSION ${CMAKE_HOST_SYSTEM_VERSION}")
 # backtrace need Linux syscall
 if (CMAKE_SYSTEM_NAME MATCHES "Linux")
-    add_compile_definitions(NEED_LOG_STACK_TRACE)
+    add_compile_definitions(NEED_LOG_STACK_TRACE=1)
 endif()
 
 # compiler info

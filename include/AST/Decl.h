@@ -19,6 +19,8 @@
 #include "AST/SymbolTable.h"
 #include "AST/Stmt.h"
 
+class Stmt;
+class ExprStmt;
 
 /// \brief C-family declarations
 class Decl : public ast_ilist_node<Decl> {
@@ -38,7 +40,7 @@ public:
     unsigned getDeclID() const { return SubClassID; }
     llvm::StringRef getName() const { return Name; }
 protected:
-    const std::string &Name;
+    std::string Name;
 };
 
 
@@ -51,17 +53,22 @@ public:
     /// \brief We expect a compile unit is composed of
     /// a list of declarations; nullptr if there is no
     /// declarations
-    CompileUnitDecl(Decl *DeList, const std::string &FileName);
+    CompileUnitDecl(const std::string &FileName, Decl *Decls = nullptr);
 public:
+    void CreateSubDecls(Decl *);
+    llvm::LLVMContext *getContext() const { return Context.get(); }
+    llvm::IRBuilder<> *getBuilder() const { return Builder.get(); }
+    llvm::Module *getModule() const { return Module.get(); }
     /// \brief Dump the CompileUnit.
     void print() const { Module->print(llvm::outs(), nullptr); };
     void CodeGen();
-public:
+
+    SymbolTable<llvm::Value *> Symbol;
+private:
     llvm::SmallVector<Decl *, 10> Decls;
     std::unique_ptr<llvm::LLVMContext> Context;
     std::unique_ptr<llvm::IRBuilder<>> Builder;
     std::unique_ptr<llvm::Module> Module;
-    SymbolTable<llvm::Value *> Symbol;
 };
 
 
@@ -132,7 +139,7 @@ class ParamDecl : public VarDecl {
 public:
     ParamDecl() = default;
     ParamDecl(TypeInfo *T, const std::string &name)
-        : VarDecl(name) 
+        : VarDecl(std::move(name))
     {
         VarDecl::setType(T);
     }
@@ -151,11 +158,8 @@ class FunctionDecl final : public Decl {
 public:
     // constructors
     FunctionDecl() = delete;
-    /// \brief declare a function returns a value of \p return_type with no param.
-    FunctionDecl(TypeInfo *return_type, const std::string &name)
-        : Decl(name) { ReturnType = return_type; }
     /// \brief declare a function returns a value of \p return_type with parameters of \p params.
-    FunctionDecl(TypeInfo *return_type, const std::string &name, ParamDecl *ParaList);
+    FunctionDecl(TypeInfo *return_type, const std::string &name, ParamDecl *ParaList = nullptr);
 public:
     llvm::Function* CodeGen(CompileUnitDecl *);
     /// \brief Returns true if the function has a function definition body.

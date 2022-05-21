@@ -1,11 +1,10 @@
 #ifndef AST_H
 #define AST_H
 /// \file AST.h
-/// \brief delcare common ancenstor AST node 
+/// \brief statement type AST node
 /// and two basic derived type StmtAST and DeclAST.
 ///
-/// We utilize a common ancenstor for AST node classes 
-/// but refer to Clang AST Stmt & Decl designs.
+/// Refer to Clang AST Stmt & Decl designs.
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/APFixedPoint.h"
 #include "llvm/ADT/APFloat.h"
@@ -25,11 +24,25 @@
 #include <list>
 
 class CompileUnitDecl;
+class VarDecl;
+class Stmt;
+class DeclStmt;
+class IfStmt;
+class ForStmt;
+class CompoundStmt;
+class ExprStmt;
+class CallStmt;
+class ArraySubscriptStmt;
+class DeclRefStmt;
+class BinaryOperatorStmt;
+class IntegerLiteral;
+class FloatingLiteral;
 
 /// \brief Statement AST node (expression included)
 class Stmt : public ast_ilist_node<Stmt> {
     uint8_t SubClassID;
 public:
+    Stmt() = default;
     virtual ~Stmt() = default;
 public:
     // statement types.
@@ -61,14 +74,16 @@ public:
     /// \brief After Bison parser get type,
     /// set type of child declaration list.
     void setType(TypeInfo *type);
-    DeclListTy &getDeclList() { return decl_list; }
+    DeclListTy &getDeclList() {
+        return Decls;
+    }
     llvm::Value *CodeGen(CompileUnitDecl *) override;
 
     static bool classof(Stmt *S) {
         return S->getStmtID() == Stmt::kDeclStmt;
     }
 private:
-    llvm::llvm::SmallVector<VarDecl *, 10> Decls;
+    llvm::SmallVector<VarDecl *, 10> Decls;
 };
 
 
@@ -94,17 +109,17 @@ public:
         return S->getStmtID() == Stmt::kCompoundStmt;
     }
 private:
-    llvm::llvm::SmallVector<Stmt *, 10> Stmts;
+    llvm::SmallVector<Stmt *, 10> Stmts;
 };
 
 
 class IfStmt : public Stmt {
-    uint8_t SubClassID { Stmt::kIfStmt };
+    uint8_t SubClassID {Stmt::kIfStmt };
 public:
     IfStmt() = delete;
     IfStmt(ExprStmt *Cond, Stmt *Then, Stmt *Else = nullptr);
 public:
-    llvm::Value *CodeGen() override;
+    llvm::Value *CodeGen(CompileUnitDecl *) override;
 private:
     ExprStmt *Cond;
     Stmt *Then, *Else;
@@ -150,7 +165,7 @@ public:
     /// synthesis attribute.
     /// We may use hand-written top-down paresr to fix this problem.
     virtual TypeInfo *getType(CompileUnitDecl *) = 0;
-
+    enum ExprValueKind getValueKind() const { return ValueKind; }
     static bool classof(Stmt *S) {
         return S->getStmtID() == Stmt::kExprStmt;
     }
@@ -244,7 +259,7 @@ private:
 
 
 /// \brief Binary operations like plus, minus in AST.
-class BinaryOperator : public ExprStmt {
+class BinaryOperatorStmt : public ExprStmt {
     uint8_t SubClassID { Stmt::kBinaryOperator };
 public:
     /// \brief Binary Operator varieties
@@ -256,9 +271,9 @@ public:
     };
 public:
     // constructors.
-    BinaryOperator() = delete;
+    BinaryOperatorStmt() = delete;
     // If given two operands, the type of result need to deduce later.
-    BinaryOperator(enum BinaryOpcode opcode, Stmt *LHS, Stmt *RHS)
+    BinaryOperatorStmt(enum BinaryOpcode opcode, ExprStmt *LHS, ExprStmt *RHS)
         : ExprStmt(ExprStmt::RValue), Opcode(opcode)
     {
       SubExprs[0] = LHS;
@@ -267,14 +282,15 @@ public:
 public:
     uint32_t getOpcode() const { return Opcode; }
     llvm::Value *CodeGen(CompileUnitDecl *) override;
-    TypeInfo *getType() override;
+    TypeInfo *getType(CompileUnitDecl *) override;
     static bool classof(const Stmt *S) {
         return S->getStmtID() == Stmt::kBinaryOperator;
     }
 protected:
     llvm::Value *Operands[2];
-    Stmt *SubExprs[2];
+    ExprStmt *SubExprs[2];
     enum BinaryOpcode Opcode {Unknown};
+    bool isSigned {true};
 };
 
 
@@ -291,7 +307,7 @@ public:
     /// \brief Get the value of literal.
     uint64_t getVal() const;
     llvm::Value *CodeGen(CompileUnitDecl *) override;
-    TypeInfo *getType() override {
+    TypeInfo *getType(CompileUnitDecl *U) override {
         return ExprType;
     }
     static bool classof(const Stmt *S) {
@@ -313,7 +329,7 @@ public:
 public:
     double getVal() const;
     llvm::Value *CodeGen(CompileUnitDecl *) override;
-    TypeInfo *getType() override {
+    TypeInfo *getType(CompileUnitDecl *U) override {
         return ExprType;
     }
     static bool classof(const Stmt *S) {

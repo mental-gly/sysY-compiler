@@ -58,7 +58,7 @@ public:
         << "Duplicated symbol " << symbol.str();
     }
 
-    /// \brief lookup the symol table and return the entry;
+    /// \brief lookup the symbol table and return the entry;
     /// if not exist, throw error messages.
     EntryType lookup(llvm::StringRef symbol) {
         EntryType entry;
@@ -66,7 +66,7 @@ public:
             if ((entry = Scope->lookup(symbol)) != EntryType()) 
                 return entry;
         }
-        LOG(FATAL) << "Undeclared symbol " << symbol.str();
+        LOG(WARNING) << "Undeclared symbol " << "'" << symbol.str() << "'";
         return EntryType();
     }
 

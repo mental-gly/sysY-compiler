@@ -1,8 +1,10 @@
 #include "AST/Decl.h"
 #include "AST/TypeInfo.h"
+#include "llvm/IR/Verifier.h"
+#include "llvm/Support/raw_ostream.h"
 
 //===-- CompileUnit --===//
-CompileUnitDecl::CompileUnitDecl(Decl *decls, const std::string &FileName)
+CompileUnitDecl::CompileUnitDecl(const std::string &FileName, Decl *decls)
     :Decl(FileName)
 {
     // initialize Context, Builder and Module.
@@ -17,9 +19,29 @@ CompileUnitDecl::CompileUnitDecl(Decl *decls, const std::string &FileName)
             decl = decl->Next;
         }
     }
-    else LOG(WARNING) << FileName << " has nothing to compile";
 }
 
+void CompileUnitDecl::CreateSubDecls(Decl *DeList) {
+    // Set declaration list in this compile unit.
+    if (DeList != nullptr) {
+        auto decl = DeList;
+        while (decl != nullptr) {
+            Decls.push_back(decl);
+            decl = decl->Next;
+        }
+    }
+}
+
+void CompileUnitDecl::CodeGen() {
+    if (Decls.empty()) {
+        LOG(WARNING) << Name << " has nothing to compile\n";
+    }
+    else {
+        for (auto Decl: Decls) {
+            static_cast<FunctionDecl *>(Decl)->CodeGen(this);
+        }
+    }
+}
 
 //===-- FunctionDecl --===//
 
@@ -28,16 +50,17 @@ FunctionDecl::FunctionDecl(TypeInfo *return_type, const std::string &name, Param
 {
     ReturnType = return_type;
     auto param = params;
-    CHECK(param) << "Empty parameter list";
-    while (params->Next != nullptr) {
+    while (param != nullptr) {
         Params.push_back(param);
         // We guarantee it's a safe static_cast.
         param = static_cast<ParamDecl *>(param->Next);
     }
+    Body = nullptr;
 }
 
 bool FunctionDecl::hasDefinition(CompileUnitDecl *U) const {
-    auto F = U->Module->getFunction(Name);
+    auto module = U->getModule();
+    auto F = module->getFunction(Name);
     if (F == nullptr || F->empty())
         return false;
     return true;
@@ -45,6 +68,9 @@ bool FunctionDecl::hasDefinition(CompileUnitDecl *U) const {
 
 
 llvm::Function *FunctionDecl::CodeGen(CompileUnitDecl *U) {
+    auto module = U->getModule();
+    auto builder = U->getBuilder();
+    auto context = U->getContext();
     // Collecting function return type and param type info.
     llvm::SmallVector<llvm::Type *, 10> ParamT;
     for (const auto param : Params) {
@@ -53,7 +79,7 @@ llvm::Function *FunctionDecl::CodeGen(CompileUnitDecl *U) {
     llvm::Type *RetT = ReturnType->Type;
     // Currently, we do not support var args.
     llvm::FunctionType *FunT;
-    if (Params.size() == 0) {
+    if (Params.size() != 0) {
         FunT = llvm::FunctionType::get(RetT, ParamT, false);
     } else {
         FunT = llvm::FunctionType::get(RetT, false);
@@ -64,47 +90,50 @@ llvm::Function *FunctionDecl::CodeGen(CompileUnitDecl *U) {
     //  1. if this function do not exist, add a prototype and return this function.
     //  2. if the existing function has the correct prototype, return the existing one.
     //  3. if the existing function has the wrong prototype, the function is a constantexpr cast to right prototype.
-    llvm::FunctionCallee FWrapper = U->Module->getOrInsertFunction(Name, FunT);
-    if (auto F = dyn_cast<llvm::Function>(FWrapper.getCallee())) {
+    llvm::FunctionCallee FWrapper = module->getOrInsertFunction(Name, FunT);
+    if (auto F = llvm::dyn_cast<llvm::Function>(FWrapper.getCallee())) {
         // If the FunctionDecl has a Stmt body,
         // generate the code, the F would be automatically
         // transformed from \p declare into a \p define
         if (hasBody()) {
             U->Symbol.CreateScope();
-            auto *Entry = llvm::BasicBlock::Create(*U->Context, "entry", F);
-            U->Builder->SetInsertPoint(Entry);
+            auto *Entry = llvm::BasicBlock::Create(*context, "entry", F);
+            builder->SetInsertPoint(Entry);
             // store return val.
             llvm::AllocaInst *RetValAlloca = nullptr;
+            auto FinalRetBB = llvm::BasicBlock::Create(*context, "ret");
             if (!F->getReturnType()->isVoidTy()) {
-                RetValAlloca = U->Builder->CreateAlloca(F->getReturnType(),
+                RetValAlloca = builder->CreateAlloca(F->getReturnType(),
                                          0, llvm::Twine(F->getName(), "ret"));
             }
 
             // Store Args.
             for (auto &Arg : F->args()) {
-                llvm::AllocaInst *Alloca = U->Builder->CreateAlloca(Arg.getType(),
-                                         0, Arg.getName());
+                LOG(INFO) << "In function " << F->getName().str() << " Param: " << Arg.getName().str() << "\n";
+                llvm::AllocaInst *Alloca = builder->CreateAlloca(Arg.getType(),
+                                         0, Params[Arg.getArgNo()]->getName());
                 // add to symbol table.
                 U->Symbol[Arg.getName()] = Alloca;
-                U->Builder->CreateStore(&Arg, Alloca);
+                builder->CreateStore(&Arg, Alloca);
             }
             // Generate definition.
             Body->CodeGen(U);
             // deal with final ret,
             // if there is no ret, we add a final ret.
             if (!llvm::isa<llvm::ReturnInst>(F->getBasicBlockList().back().back())) {
-                auto *FinalRet = llvm::BasicBlock::Create(*U->Context, "ret", F);
-                U->Builder->CreateBr(FinalRet);
-                U->Builder->SetInsertPoint(FinalRet);
+                F->getBasicBlockList().push_back(FinalRetBB);
+                builder->CreateBr(FinalRetBB);
+                builder->SetInsertPoint(FinalRetBB);
                 // need load the return val.
                 llvm::Value *RetVal = nullptr;
                 if (!F->getReturnType()->isVoidTy()) {
-                    RetVal = U->Builder->CreateLoad(F->getReturnType(), RetValAlloca);
+                    RetVal = builder->CreateLoad(F->getReturnType(), RetValAlloca);
                 }
-                U->Builder->CreateRet(RetVal);
+                builder->CreateRet(RetVal);
             }
-            U->Builder->ClearInsertionPoint();
+            builder->ClearInsertionPoint();
             U->Symbol.LeaveScope();
+            llvm::verifyFunction(*F, &llvm::errs());
         }
     } else {
         LOG(FATAL) << "Conflicting type for " << "'" << Name << "'";

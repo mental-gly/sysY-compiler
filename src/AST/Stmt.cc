@@ -1,4 +1,6 @@
 #include "AST/Stmt.h"
+#include "llvm/IR/ValueSymbolTable.h"
+using namespace llvm;
 
 //===-- DeclStmt --===//
 DeclStmt::DeclStmt(VarDecl *DeList) {
@@ -15,6 +17,9 @@ void DeclStmt::setType(TypeInfo *type) {
     }
 }
 
+Value *DeclStmt::CodeGen(CompileUnitDecl *U) {
+    // currently do nothing.
+}
 
 //===-- CompoundStmt --===//
 CompoundStmt::CompoundStmt(Stmt *StList) {
@@ -29,11 +34,11 @@ void CompoundStmt::CreateSubStmt(Stmt *SubStmt) {
     Stmts.push_back(SubStmt);
 }
 
-llvm::Value *CompoundStmt::CodeGen(CompileUnitDecl *U) {
+Value *CompoundStmt::CodeGen(CompileUnitDecl *U) {
     // Compoundstmt inside is a new scope,
     // Which is managed by CompoundStmt.
     U->Symbol.CreateScope();
-    llvm::ReturnInst *RetInstTrack;
+    ReturnInst *RetInstTrack;
     for (auto SubStmt : Stmts) {
         SubStmt->CodeGen(U);
         // optimization : ignore statements after ret.
@@ -44,6 +49,72 @@ llvm::Value *CompoundStmt::CodeGen(CompileUnitDecl *U) {
 }
 
 //===-- IfStmt --===//
+
+IfStmt::IfStmt(ExprStmt *Cond, Stmt *Then, Stmt *Else)
+    : Cond(Cond), Then(Then), Else(Else)
+{
+    CHECK_NE(Cond, nullptr) << "Expect expression in `if` condition.";
+    if (Then == nullptr)
+        LOG(WARNING) << "Empty statement body.";
+}
+
+Value *IfStmt::CodeGen(CompileUnitDecl *U) {
+    auto builder = U->getBuilder();
+    auto context = U->getContext();
+    Value *CondV = Cond->CodeGen(U);
+    Value *LogicCondV;
+    CHECK(CondV->getType()->isSingleValueType())
+        << "Expect a scalar type in `if` condition";
+    // If integer number, compare with 0.
+    if (CondV->getType()->isIntegerTy()) {
+        LogicCondV = builder->
+                CreateICmpNE(CondV,
+                             ConstantInt::get(CondV->getType(), 0),
+                             "ifcond");
+    }
+    // If floating number, compare with 0.0.
+    else if (CondV->getType()->isFloatTy()) {
+        LogicCondV = builder->
+                CreateFCmpONE(CondV,
+                              ConstantFP::get(CondV->getType(), 0.0),
+                              "ifcond");
+    }
+    // If pointer type, compare with null.
+    else if (CondV->getType()->isPointerTy()) {
+        LogicCondV = builder->
+                CreateICmpNE(CondV,
+                             ConstantPointerNull::get(
+                                     dyn_cast<PointerType>(CondV->getType())),
+                             "ifcond");
+    }
+    // Optimization, neglect empty then block.
+    if (Then != nullptr) {
+        // Get the parent function.
+        auto F = builder->GetInsertBlock()->getParent();
+        auto ThenBB = BasicBlock::Create(*context, "then", F);
+        auto ElseBB = BasicBlock::Create(*context, "else");
+        auto MergeBB = BasicBlock::Create(*context, "merge");
+        // Conditional branch.
+        builder->CreateCondBr(LogicCondV, ThenBB, ElseBB);
+        // Gen Then.
+        builder->SetInsertPoint(ThenBB);
+        Then->CodeGen(U);
+        ThenBB = builder->GetInsertBlock();
+        if (!isa<ReturnInst>(ThenBB->back())) builder->CreateBr(MergeBB);
+        // Update Then block;
+        // if then block generate multiple BB,
+        // we should locate the ThenBB to the last basic block.
+        F->getBasicBlockList().push_back(ElseBB);
+        // Gen Else.
+        builder->SetInsertPoint(ElseBB);
+        if (Else != nullptr) Else->CodeGen(U);
+        ElseBB = builder->GetInsertBlock();
+        if (!isa<ReturnInst>(ElseBB->back())) builder->CreateBr(MergeBB);
+        F->getBasicBlockList().push_back(MergeBB);
+        builder->SetInsertPoint(MergeBB);
+    }
+    return nullptr;
+}
 
 
 
@@ -61,16 +132,19 @@ CallStmt::CallStmt(const std::string &Func, ExprStmt *ArgList)
 TypeInfo *CallStmt::getType(CompileUnitDecl *U) {
     if (ExprType != nullptr)
         return ExprType;
+    return nullptr;
 }
 
-llvm::Value *CallStmt::CodeGen(CompileUnitDecl *U) {
-    llvm::Function *F = U->Module->getFunction(Callee);
+Value *CallStmt::CodeGen(CompileUnitDecl *U) {
+    auto module = U->getModule();
+    auto builder = U->getBuilder();
+    llvm::Function *F = module->getFunction(Callee);
     CHECK(F) << "Call unknown function " << Callee;
     llvm::SmallVector<llvm::Value *, 10> ArgsV;
     for (ExprStmt *&Expr : Args) {
       ArgsV.push_back(Expr->CodeGen(U));
     }
-    return U->Builder->CreateCall(F, ArgsV, llvm::Twine("Call", Callee));
+    return builder->CreateCall(F, ArgsV, llvm::Twine("Call", Callee));
 }
 
 //===-- DeclRefStmt --===//
@@ -82,17 +156,20 @@ TypeInfo *DeclRefStmt::getType(CompileUnitDecl *U) {
     // If we have searched symbol of the Ref.
     if (ExprType != nullptr)
         return ExprType;
+    return nullptr;
 }
 
 /// \brief Load variable into virtual register.
-llvm::Value *DeclRefStmt::CodeGen(CompileUnitDecl *U) {
-    // The referenced symbol must be a alloca addr or global value addr,
-    llvm::Value *AddrOrGlob = U->Symbol.lookup(Symbol);
-    CHECK_NE(AddrOrGlob, nullptr) << "Undeclared variable " << Symbol;
-    CHECK((llvm::dyn_cast<llvm::GlobalValue *>(AddrOrGlob) != nullptr)
-          || (llvm::dyn_cast<llvm::AllocaInst *>(AddrOrGlob) != nullptr)) << "Not a local or global variable.";
-    llvm::LoadInst *Load = U->Builder->CreateLoad(AddrOrGlob);
-    return Load;
+Value *DeclRefStmt::CodeGen(CompileUnitDecl *U) {
+    auto builder = U->getBuilder();
+    // The referenced symbol must be an alloca addr or global value addr,
+    auto F = builder->GetInsertBlock()->getParent();
+    Value *AddrOrGlob = F->getValueSymbolTable()->lookup(Symbol);
+    // Value *AddrOrGlob = U->Symbol.lookup(Symbol);
+    CHECK_NE(AddrOrGlob, nullptr) << "Undeclared variable " << "'" << Symbol << "'";
+    CHECK((dyn_cast<GlobalValue>(AddrOrGlob) != nullptr)
+          || (dyn_cast<AllocaInst>(AddrOrGlob) != nullptr)) << "Not a local or global variable.";
+    return AddrOrGlob;
 }
 
 //===-- ArraySubscriptStmt --===//
@@ -107,19 +184,21 @@ ArraySubscriptStmt::ArraySubscriptStmt(ExprStmt *base, ExprStmt *idx)
 TypeInfo *ArraySubscriptStmt::getType(CompileUnitDecl *U) {
     if (ExprType != nullptr)
         return ExprType;
+    return nullptr;
 }
 
-llvm::Value *ArraySubscriptStmt::CodeGen(CompileUnitDecl *U) {
+Value *ArraySubscriptStmt::CodeGen(CompileUnitDecl *U) {
+    auto builder = U->getBuilder();
     auto BaseVal = Base->CodeGen(U);
     auto IdxVal = Base->CodeGen(U);
     CHECK(BaseVal->getType()->isArrayTy() || BaseVal->getType()->isPointerTy())
         << "'" << reinterpret_cast<DeclRefStmt *>(BaseVal)->getSymbolName().str() << "'"
         << " should be an array or a pointer type";
-    return U->Builder->CreateGEP(BaseVal, IdxVal);
+    return builder->CreateGEP(BaseVal, IdxVal);
 }
 
 //===-- ReturnStmt --===//
-llvm::Value *ReturnStmt::CodeGen(CompileUnitDecl *U) {
+Value *ReturnStmt::CodeGen(CompileUnitDecl *U) {
     // If the function has non-void ret value,
     // we alloca a space for ret value;
     // We will create an extra BasicBlock
@@ -127,8 +206,10 @@ llvm::Value *ReturnStmt::CodeGen(CompileUnitDecl *U) {
     //
     // It's an alternative to add a final ret BB, and let
     // any internal return br to this final BB.
+    auto builder = U->getBuilder();
     llvm::Value *RetV = RetExpr->CodeGen(U);
-    U->Builder->CreateRet(RetV);
+    builder->CreateRet(RetV);
+    return nullptr;
 }
 
 
@@ -136,14 +217,41 @@ llvm::Value *ReturnStmt::CodeGen(CompileUnitDecl *U) {
 
 //===-- BinaryOperator --===//
 
-TypeInfo *BinaryOperator::getType() {
+TypeInfo *BinaryOperatorStmt::getType(CompileUnitDecl *U) {
     if (ExprType != nullptr)
         return ExprType;
+    return nullptr;
 }
 
-llvm::Value *BinaryOperator::CodeGen(CompileUnitDecl *U) {
+static Value *doGreater(IRBuilder<> *builder, Value *LHS, Value *RHS, bool isSigned) {
+    // We suppose after semantic analysis or carefully
+    // write code, LHS and RHS has the same type.
+    if (LHS->getType()->isIntegerTy()) {
+        auto LType = dyn_cast<IntegerType>(LHS->getType());
+        auto RType = dyn_cast<IntegerType>(RHS->getType());
+        if (isSigned) return builder->CreateICmpSGT(LHS, RHS);
+        else return builder->CreateICmpUGT(LHS, RHS);
+    }
+    if (LHS->getType()->isDoubleTy() || LHS->getType()->isFloatTy()) {
+        return builder->CreateFCmpOGT(LHS, RHS);
+    }
+    return nullptr;
+}
+
+Value *BinaryOperatorStmt::CodeGen(CompileUnitDecl *U) {
+    auto builder = U->getBuilder();
     Operands[0] = SubExprs[0]->CodeGen(U);
     Operands[1] = SubExprs[1]->CodeGen(U);
+    // We use load/store pair to store local variables,
+    // which introduce a problem that weather it refer a addr/value
+    // while using the name of a variable.
+    //
+    // Clang use ImplicitCastOp casting LValue to RValue to solve this problem.
+    // Here we do somehow similar but a little dirty works.
+    if (Opcode != Assign && SubExprs[0]->getValueKind() == ExprStmt::LValue)
+        Operands[0] = builder->CreateLoad(Operands[0]->getType()->getPointerElementType(), Operands[0]);
+    if (SubExprs[1]->getValueKind() == ExprStmt::LValue)
+        Operands[1] = builder->CreateLoad(Operands[1]->getType()->getPointerElementType(),Operands[1]);
     if (Operands[0] == nullptr || Operands[1] == nullptr)
         return nullptr;
     // considering implicit casting
@@ -153,10 +261,13 @@ llvm::Value *BinaryOperator::CodeGen(CompileUnitDecl *U) {
     // neglect Twine name
     CHECK_NE(Opcode, Unknown) << "Unknown Binary Operation Opcode!";
     switch (Opcode) {
-        case Add    :   return U->Builder->CreateAdd(Operands[0], Operands[1]);
-        case Sub    :   return U->Builder->CreateSub(Operands[0], Operands[1]);
-        case Mul    :   return U->Builder->CreateMul(Operands[0], Operands[1]);
+        case Add    :   return builder->CreateAdd(Operands[0], Operands[1]);
+        case Sub    :   return builder->CreateSub(Operands[0], Operands[1]);
+        case Mul    :   return builder->CreateMul(Operands[0], Operands[1]);
+        case Assign :   return builder->CreateStore(Operands[1], Operands[0]);
+        case Greater : return doGreater(builder, Operands[0], Operands[1], isSigned);
     }
+    return nullptr;
 }
 
 
@@ -180,8 +291,8 @@ uint64_t IntegerLiteral::getVal() const {
     return Value.getZExtValue();
 }
 
-llvm::Value *IntegerLiteral::CodeGen(CompileUnitDecl *U) {
-    return llvm::ConstantInt::get(*U->Context, Value);
+Value *IntegerLiteral::CodeGen(CompileUnitDecl *U) {
+    return ConstantInt::get(*U->getContext(), Value);
 }
 
 
@@ -205,6 +316,6 @@ double FloatingLiteral::getVal() const {
     return Value.convertToDouble();
 }
 
-llvm::Value *FloatingLiteral::CodeGen(CompileUnitDecl *U) {
-    return llvm::ConstantFP::get(*U->Context, Value);
+Value *FloatingLiteral::CodeGen(CompileUnitDecl *U) {
+    return ConstantFP::get(*U->getContext(), Value);
 }

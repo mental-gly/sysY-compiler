@@ -6,7 +6,7 @@
 #ifndef LOGGING_H
 #define LOGGING_H
 #ifndef STACK_TRACE_SIZE
-#define STACK_TRACE_SIZE 5
+#define STACK_TRACE_SIZE 8
 #endif
 
 #include <iostream>
@@ -18,7 +18,7 @@
 #include <stdexcept>
 
 
-#if NEED_LOG_STACK_TRACE & __GNUC__
+#if NEED_LOG_STACK_TRACE && __GNUC__
 // stack trace feature requires Linux execinfo syscalls
 // and -rdynamic compile flag to fetch symbols
 #include <cxxabi.h>
@@ -84,8 +84,9 @@ inline std::string BackTrace(
 
 class Log {
 public:
-    Log(const char *category) {
+    Log(const char *category, const char *file, size_t line) {
         _M_stream << "\033[33m" << category << ": \033[0m";
+        _M_stream << file << ":" << line << ": ";
     }
     ~Log() {
         std::cout << _M_stream.str();
@@ -147,8 +148,8 @@ CHECK_FUNC(_NE, !=)
 
 
 #define LOG_FATAL LogFatal(__FILE__, __LINE__)
-#define LOG_INFO  Log("INFO")
-#define LOG_WARNING Log("Warning")
+#define LOG_INFO  Log("INFO", __FILE__, __LINE__)
+#define LOG_WARNING Log("Warning", __FILE__, __LINE__)
 #define LOG(severity) LOG_##severity.stream()
 
 #endif // LOGGING_H

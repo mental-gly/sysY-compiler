@@ -1,17 +1,17 @@
 %code requires {
-  #include <memory>
-  #include <string>
+#include <memory>
+#include <string>
+#include "AST/Decl.h"
+#include "AST/Stmt.h"
+#include "AST/TypeInfo.h"
 }
 
 %{
 #include <cassert>
 #include <cstdio>
 #include <iostream>
-#include <memory>
-#include <string>
-#include "logging.h"
-#include "AST/Decl.h"
-#include "AST/Stmt.h"
+
+
 
 using namespace std;
 
@@ -19,11 +19,11 @@ int yylex();
 void yyerror(CompileUnitDecl& comp_unit, const char *s);
 extern FILE* yyin;
 
-FunctionDecl *func_decl_tail;
-ParamDecl *param_decl_tail;
-ExprStmt *expr_stmt_tail;
-CompoundStmt *comp_stmt_tail;
-VarDecl *iden_tail;
+static FunctionDecl *func_decl_tail;
+static ParamDecl *param_decl_tail;
+static ExprStmt *expr_stmt_tail;
+static CompoundStmt *comp_stmt_tail;
+static VarDecl *iden_tail;
 %}
 
 %parse-param { CompileUnitDecl& comp_unit }
@@ -80,7 +80,7 @@ CompileUnit
 FunctionDecl 
 : basicType IDENTIFIER OPENPAREN ParamList CLOSEPAREN Block{
     auto type = $1;
-    auto ident = new string($2);
+    auto ident = $2;
     auto param_list = $4;
     auto block = $6;
     $$ = new FunctionDecl(TypeContext::find(*type), *ident, param_list);
@@ -88,7 +88,7 @@ FunctionDecl
 } 
 | basicType IDENTIFIER OPENPAREN ParamList CLOSEPAREN SEMICOLON{
     auto type = $1;
-    auto ident = new string($2);
+    auto ident = $2;
     auto param_list = $4;
     $$ = new FunctionDecl(TypeContext::find(*type), *ident, param_list);
 }
@@ -115,12 +115,12 @@ ParamDecl
 }
 | basicType IDENTIFIER{
     auto type = $1;
-    auto ident = new string($2);
+    auto ident = $2;
     $$ = new ParamDecl(TypeContext::find(*type), *ident);
 }
 | basicType IDENTIFIER OPENBRACKET IntegerLiteral CLOSEBRACKET{
     auto type = $1;
-    auto ident = new string($2);
+    auto ident = $2;
     auto num = $4 -> getVal();
     $$ = new ParamDecl(REGISTER_ARRAY(*type, num), *ident);
 }
@@ -256,7 +256,7 @@ DeclStmt
 }
 | basicType IDENTIFIER OPENBRACKET IntegerLiteral CLOSEBRACKET SEMICOLON{
     auto type = $1;
-    auto ident = new string($2);
+    auto ident = $2;
     auto var = new VarDecl(*ident);
     auto num = $4 -> getVal();
     $$ = new DeclStmt(var);
@@ -424,19 +424,19 @@ IntegerLiteral
 
 DeclRefStmt
 : IDENTIFIER OPENBRACKET ExprStmt CLOSEBRACKET{
-    auto ident = new string($1);
+    auto ident = $1;
     auto base = new DeclRefStmt(*ident);
     auto expr_stmt = $3;
     $$ = new ArraySubscriptStmt(base, expr_stmt);
 }
 | IDENTIFIER{
-    auto ident = new string($1);
+    auto ident = $1;
     $$ = new DeclRefStmt(*ident);
 }
 
 CallStmt
 : IDENTIFIER OPENPAREN ExprStmtList CLOSEPAREN{
-    auto ident =new string($1);
+    auto ident = $1;
     auto expr_list = $3;
     $$ = new CallStmt(*ident, expr_list);
 }
@@ -459,13 +459,13 @@ ExprStmtList
 
 IdentifierList
 : IDENTIFIER{
-    auto ident = new string($1);
+    auto ident = $1;
     auto iden_ptr = new VarDecl(*ident);
     iden_tail = iden_ptr;
     $$ = iden_ptr;
 }
 | IdentifierList COMMA IDENTIFIER{
-    auto i = new string($3);
+    auto i = $3;
     auto ident = new VarDecl(*i);
     iden_tail -> Next = ident;
     ident -> Prev = iden_tail;

@@ -40,7 +40,7 @@ VarDecl *iden_tail;
   Decl* decl_val;
 }
 
-%type <type_info_val> basicType 
+%type <str_val> basicType 
 %type <decl_val> FunctionDecl ParamList ParamDecl IdentifierList CompileUnit Program
 %type <stmt_val> CompoundStmtList DeclStmt ReturnStmt ExprStmt DeclRefStmt IntegerLiteral CallStmt ExprStmtList IfStmt MatchedStmt UnmatchedStmt WhileStmt Block
 %token T_CHAR T_INT T_STRING T_BOOL T_VOID
@@ -87,14 +87,14 @@ FunctionDecl
     auto ident = new string($2);
     auto param_list = $4;
     auto block = $6;
-    $$ = new FunctionDecl(type, *ident, param_list);
+    $$ = new FunctionDecl(TypeContext::find(*type), *ident, param_list);
     $$ -> setBody(block);
 } 
 | basicType IDENTIFIER OPENPAREN ParamList CLOSEPAREN SEMICOLON{
     auto type = $1;
     auto ident = new string($2);
     auto param_list = $4;
-    $$ = new FunctionDecl(type, *ident, param_list);
+    $$ = new FunctionDecl(TypeContext::find(*type), *ident, param_list);
 }
 ;
 
@@ -117,10 +117,16 @@ ParamDecl
 : {
     $$ = new ParamDecl();
 }
-|basicType IDENTIFIER{
+| basicType IDENTIFIER{
     auto type = $1;
     auto ident = new string($2);
-    $$ = new ParamDecl(type, *ident);
+    $$ = new ParamDecl(TypeContext::find(*type), *ident);
+}
+| basicType IDENTIFIER OPENBRACKET IntegerLiteral CLOSEBRACKET{
+    auto type = $1;
+    auto ident = new string($2);
+    auto num = $4 -> getVal();
+    $$ = new ParamDecl(REGISTER_ARRAY(*type, num), *ident);
 }
 ; 
 
@@ -133,16 +139,13 @@ Block
 
 basicType
 : INTEGER {
-    auto IntType = TypeContext::find("int");
-    $$ = IntType;
+    $$ = new string("int");
 }
 | CHAR {
-    auto CharType = TypeContext::find("bool");
-    $$ = CharType;
+    $$ = new string("char");
 }
 | VOID {
-    auto VoidType = TypeContext::find("void");
-    $$ = VoidType;
+    $$ = new string("void");
 }
 ;
 
@@ -241,19 +244,27 @@ UnmatchedStmt
 }
 ;
 
-//todo  数组声明action
+WhileStmt
+: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmt{
+    auto expr_stmt = $3;
+    auto comp_stmt = $5;
+    $$ = new WhileStmt(expr_stmt, comp_stmt);
+}
+
 DeclStmt
 : basicType IdentifierList SEMICOLON{
     auto type = $1;
     auto ident_list = $2;
     $$ = new DeclStmt(ident_list);
-    $$ -> setType(type);
+    $$ -> setType(TypeContext::find(*type));
 }
 | basicType IDENTIFIER OPENBRACKET IntegerLiteral CLOSEBRACKET SEMICOLON{
     auto type = $1;
     auto ident = new string($2);
+    auto var = new VarDecl(*ident);
     auto num = $4 -> getVal();
-    $$ = ;
+    $$ = new DeclStmt(var);
+    $$ -> setType(REGISTER_ARRAY(*type, num));
 }
 ;
 

@@ -9,10 +9,6 @@
 #include <iostream>
 #include <memory>
 #include <string>
-#include "llvm/IR/Module.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/Type.h"
-#include "llvm/Support/raw_ostream.h"
 #include "logging.h"
 #include "AST/Decl.h"
 #include "AST/Stmt.h"
@@ -245,7 +241,7 @@ UnmatchedStmt
 ;
 
 WhileStmt
-: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmt{
+: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList{
     auto expr_stmt = $3;
     auto comp_stmt = $5;
     $$ = new WhileStmt(expr_stmt, comp_stmt);

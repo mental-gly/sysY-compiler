@@ -52,7 +52,7 @@ struct TypeInfo {
 class TypeContext {
 public:
     /// \brief register primitive types.
-    static void Init();
+    static void Init(llvm::LLVMContext *);
     static bool checkEquivalence(TypeInfo *Src, TypeInfo *Tgt);
 
     static TypeInfo *find(const std::string &name_key);
@@ -69,10 +69,15 @@ public:
     [[maybe_unused]] static TypeInfo &createStructType(const std::string &name_key, const std::vector<TypeInfo *> members) {
         LOG(FATAL) << "Struct is not supported!";
     }
+
+    static void SetLLVMType(TypeInfo *T, llvm::Type *MapT) {
+        T->Type = MapT;
+    }
 private:
     // Type table only operate at one end and
     // requires fast append and remove operation.
     static std::vector<TypeInfo> type_table;
+    static llvm::LLVMContext *context;
 };
 
 

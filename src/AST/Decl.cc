@@ -47,6 +47,11 @@ void CompileUnitDecl::CodeGen() {
     }
 }
 
+
+void CompileUnitDecl::print() {
+     getModule()->print(llvm::outs(), nullptr); 
+}
+
 //===-- FunctionDecl --===//
 
 FunctionDecl::FunctionDecl(TypeInfo *return_type, const std::string &name, ParamDecl *params)

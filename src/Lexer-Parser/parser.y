@@ -1,16 +1,35 @@
+%code requires {
+  #include <memory>
+  #include <string>
+}
+
 %{
-    int yyerror(char* s);
-    #include "decl.h"
+#include <cassert>
+#include <cstdio>
+#include <iostream>
+#include <memory>
+#include <string>
+
+int yylex();
+void yyerror(std::unique_ptr<std::string> &ast, const char *s);
+extern FILE* yyin;
+
+using namespace std;
+
 %}
 
+%parse-param { std::unique_ptr<FunctionDecl> &comp_unit }
+%parse-param { std::unique_ptr<FunctionDecl> &func_decl_tail }
+%parse-param { std::unique_ptr<ParamDecl> &param_decl_tail }
+%parse-param { std::unique_ptr<ExprStmt> &expr_stmt_tail }
+%parse-param { std::unique_ptr<IDENTIFIER> &iden_tail }
 %union {
   std::string *str_val;
   int int_val;
 }
 
-%parse-param { std::unique_ptr<Stmt> &stmt }
-%type <stmt> DeclStmt CompoundStmt ExprStmt CallStmt DeclRef ArraySubscript BinaryOperator IntegerLiteral FloatingLiteral
-token T_CHAR T_INT T_STRING T_BOOL T_VOID
+%type <str_val> FunctionDecl basicType CompoundStmt ParamList ParamDecl DeclStmt IdentifierList ReturnStmt ExprStmt DeclRefStmt IntegerLiteral CallStmt ExprStmtList CompileUnit Program IfStmt MatchedStmt UnmatchedStmt WhileStmt
+%token T_CHAR T_INT T_STRING T_BOOL T_VOID
 %token COMMA SEMICOLON OPENPAREN CLOSEPAREN OPENBRACE CLOSEBRACE OPENBRACKET CLOSEBRACKET
 %token ADDR
 %token MOD BIAND BIOR NOT VOID
@@ -27,272 +46,65 @@ token T_CHAR T_INT T_STRING T_BOOL T_VOID
 %left MUL DIV
 
 %%
-Program
-: CompileUnit{
-    ast = unique_ptr<string>($1);
-}
-
 CompileUnit
 : CompileUnit FunctionDecl{
-    auto unit = unique_ptr<string>($1);
-    auto func_decl = unique_ptr<string>($2);
-    $$ = new string(*unit + *func_decl);
+    auto func_decl = make_unique<FunctionDecl>($2);
+    func_decl_tail -> Next = func_decl;
+    func_decl -> Prev = func_decl_tail;
+    func_decl_tail = func_decl_tail -> Next;
+    $$ = $1;
 }
 | FunctionDecl{
-    auto func_decl = unique_ptr<string>($1);
-    $$ = new string(*func_decl);
+    comp_unit = make_unique<FunctionDecl>($1);
+    func_decl_tail = comp_unit;
+    $$ = comp_unit;
 }
 ;
 
 FunctionDecl 
-: basicType IDENTIFIER OPENPAREN Paramlist CLOSEPAREN OPENBRACE CompoundStmt CLOSEBRACE{
-    TypeInfo *type = TypeContext::find($1);
-    auto func_decl = new FunctionDecl(type, $4);
-    $$ = func_decl;
+: basicType IDENTIFIER OPENPAREN ParamList CLOSEPAREN OPENBRACE CompoundStmt CLOSEBRACE{
+    auto type = unique_ptr<string>($1);
+    auto ident = unique_ptr<string>($2);
+    auto param_list = unique_ptr<string>($4);
+    auto block = unique_ptr<string>($7);
+    $$ = new string(*type + " " + *ident + "(" + *param_list + ") " + "{ " + *block + "}");
 } 
-| basicType IDENTIFIER OPENPAREN Paramlist CLOSEPAREN SEMICOLON{
-    TypeInfo *type = TypeContext::find($1);
-    auto func_decl = new FunctionDecl(type, $4);
-    $$ = func_decl; 
+| basicType IDENTIFIER OPENPAREN ParamList CLOSEPAREN SEMICOLON{
+    auto type = unique_ptr<string>($1);
+    auto ident = unique_ptr<string>($2);
+    auto param_list = unique_ptr<string>($4);
+    $$ = new string(*type + " " + *ident + "("+ *param_list+")" + ";");
 }
 ;
 
 ParamList
-: | ParamDecl{
-    auto param_list = new ParamList();
-    param_list -> ?($1);//link funtion
-    $$ = param_list; 
+: {
+    auto param_ptr = make_unique<ParamList>();
+    param_ptr -> Next = null;
+    param_decl_tail -> Next = null;
+    $$ = new string(*param_ptr);  
+}
+| ParamDecl{
+    auto param_ptr = make_unique<ParamDecl>($1);
+    param_decl_tail = param_ptr;
+    $$ = param_ptr;  
 }
 | ParamList COMMA ParamDecl{
-    $$ = $1;
-    $$ -> ?($3);
+    auto param_decl = unique_ptr<ParamDecl>($3);
+    param_decl_tail -> Next = param_decl;
+    param_decl -> Prev = param_decl_tail;
+    param_decl_tail = param_decl_tail -> Next;
+    $$ = $1;  
 }
 ;
 
 ParamDecl
 : basicType IDENTIFIER{
-    ? //type how to transport
-    VarDecl *var = new VarDecl(Decl::kVarDecl, $2);
-    auto para_decl = new ParamDecl(var);
-    $$ = para_decl;
+    auto type = unique_ptr<string>($1);
+    auto ident = unique_ptr<string>($2);
+    $$ = new string(*type +" "+ *ident);
 }
-;
-
-CompoundStmt
-: CompoundStmt DeclStmt {
-    $$ = $1;
-    $$ -> CreateSubStmt($2);
-}
-| CompoundStmt ExprStmt SEMICOLON{
-    $$ = $1;
-    $$ -> CreateSubStmt($2);
-}
-| CompoundStmt IfStmt{
-    $$ = $1;
-    $$ -> CreateSubStmt($2);
-}
-| CompoundStmt ReturnStmt{
-    $$ = $1;
-    $$ -> CreateSubStmt($2);
-}
-| DeclStmt {
-    auto comp_stmt = new CompoundStmt();
-    comp_stmt -> CreateSubStmt($1);
-    $$ = comp_stmt;
-}
-| ExprStmt SEMICOLON {
-    auto comp_stmt = new CompoundStmt();
-    comp_stmt -> CreateSubStmt($1);
-    $$ = comp_stmt;
-}
-| ReturnStmt {
-    auto comp_stmt = new CompoundStmt();
-    comp_stmt -> CreateSubStmt($1);
-    $$ = comp_stmt;
-}
-| IfStmt{
-    auto comp_stmt = new CompoundStmt();
-    comp_stmt -> CreateSubStmt($1);
-    $$ = comp_stmt;
-}
-;
-
-IfStmt
-: MatchedStmt{
-    
-}
-| UnmatchedStmt{
-
-}
-;
-
-MatchedStmt
-: IF OPENPAREN ExprStmtList CLOSEPAREN MatchedStmt ELSE MatchedStmt{
-
-}
-| OPENBRACE CompoundStmt CLOSEBRACE{
-
-}
-;
-
-UnmatchedStmt
-: IF OPENPAREN ExprStmtList CLOSEPAREN IfStmt{
-
-}
-| IF OPENPAREN ExprStmtList CLOSEPAREN MatchedStmt ELSE UnmatchedStmt{
-
-}
-;
-
-DeclStmt
-: basicType IdentifierList SEMICOLON{
-    auto decl_stmt = new DeclStmt($2);
-    TypeInfo *type = TypeContext::find($1);
-    decl_stmt -> setType(type);
-    $$ = decl_stmt;
-}
-| basicType IDENTIFIER OPENBRACKET IntegerLiteral CLOSEBRACKET SEMICOLON{
-    TypeInfo *type = REGISTER_ARRAY($1, $4->getVal());
-    VarDecl *var = new VarDecl(Decl::kVarDecl, $2);
-    auto decl_stmt = new DeclStmt(var);
-    decl_stmt -> setType(type);
-    $$ = decl_stmt;
-}
-;
-
-
-ExprStmt
-: DeclRefStmt ASSIGN ExprStmt {
-    auto _assign = new BinaryOperator(BinaryOperator::Assign, $1, $3);
-    $$ = _assign;
-}
-| DeclRefStmt OR ExprStmt{
-    auto _or = new BinaryOperator(BinaryOperator::Or, $1, $3);
-    $$ = _or;
-}  
-| DeclRefStmt XOR ExprStmt{
-    auto _xor = new BinaryOperator(BinaryOperator::Xor, $1, $3);
-    $$ = _xor;
-}
-| DeclRefStmt AND ExprStmt{
-    auto _and = new BinaryOperator(BinaryOperator::And, $1, $3);
-    $$ = _and;
-}
-| DeclRefStmt PLUS ExprStmt{
-    auto _plus = new BinaryOperator(BinaryOperator::Add, $1, $3);
-    $$ = _plus;
-}
-| DeclRefStmt MINUS ExprStmt{
-    auto _minus = new BinaryOperator(BinaryOperator::Sub, $1, $3);
-    $$ = _minus;
-}
-| DeclRefStmt MUL ExprStmt{
-    auto _mul = new BinaryOperator(BinaryOperator::Mul, $1, $3);
-    $$ = _mul;
-}
-| DeclRefStmt DIV ExprStmt{
-    auto _div = new BinaryOperator(BinaryOperator::UDiv, $1, $3);
-    $$ = _div;
-}
-| IntegerLiteral OR ExprStmt{
-    auto _or = new BinaryOperator(BinaryOperator::Or, $1, $3);
-    $$ = _or;
-}  
-| IntegerLiteral XOR ExprStmt{
-    auto _xor = new BinaryOperator(BinaryOperator::Xor, $1, $3);
-    $$ = _xor;
-}
-| IntegerLiteral AND ExprStmt{
-    auto _and = new BinaryOperator(BinaryOperator::And, $1, $3);
-    $$ = _and;
-}
-| IntegerLiteral PLUS ExprStmt{
-    auto _plus = new BinaryOperator(BinaryOperator::Add, $1, $3);
-    $$ = _plus;
-}
-| IntegerLiteral MINUS ExprStmt{
-    auto _minus = new BinaryOperator(BinaryOperator::Sub, $1, $3);
-    $$ = _minus;
-}
-| IntegerLiteral MUL ExprStmt{
-    auto _mul = new BinaryOperator(BinaryOperator::Mul, $1, $3);
-    $$ = _mul;
-}
-| IntegerLiteral DIV ExprStmt{
-    auto _div = new BinaryOperator(BinaryOperator::UDiv, $1, $3);
-    $$ = _div;
-}
-| DeclRefStmt {
-    auto expr_stmt = new ExprStmt();
-    $$ -> ?() = $1; //要把exprstmt和declrestmt找关系连起来,下面三个同理
-    $$ = expr_stmt;
-}
-| IntegerLiteral {
-    auto expr_stmt = new ExprStmt();
-    $$ -> ?() = $1;
-    $$ = expr_stmt;
-}
-| CallStmt {
-    auto expr_stmt = new ExprStmt();
-    $$ -> ?() = $1;
-    $$ = expr_stmt;
-}
-;
-
-CallStmt
-: IDENTIFIER OPENPAREN ?ExprStmtList CLOSEPAREN SEMICOLON {
-    auto call_stmt = new CallStmt($1, $3);
-    $$ = call_stmt;
-}
-;
-
-IntegerLiteral
-: INT_CONST {
-    $$ = new string(to_string($1));
-}
-;
-
-ExprStmtList
-: ExprStmt {
-    auto expr_stmtlist = new ExprStmtList($1);//? gouzaohanshu 
-    $$ = expr_stmtlist;
-}
-| ExprStmtList COMMA ExprStmt{
-    $$ = $1;
-    $$ -> ?() = $3; //link
-}
-;
-
-DeclRefStmt
-: IDENTIFIER OPENBRACKET ExprStmt CLOSEBRACKET{
-    ?auto array_sub = new ArraySubscriptStmt($1, $3); // gouzaohanshu 
-    $$ = array_sub;
-}
-| IDENTIFIER{
-
-}
-
-IdentifierList
-: IDENTIFIER{
-    auto identifier_list = new IdentifierList($1);//? 构造函数没有
-    $$ = identifier_list;
-}
-| IdentifierList COMMA IDENTIFIER{
-    $$ = $1;
-    $$ -> ?() = $3; //连接的函数没有
-}
-;
-
-ReturnStmt
-: RETURN ExprStmt SEMICOLON {
-    auto return_stmt = new ReturnStmt($2);
-    $$ = return_stmt;
-}
-| RETURN SEMICOLON {
-    auto return_stmt = new ReturnStmt(nullptr);
-    $$ = return_stmt;
-}
-;
+; 
 
 basicType
 : INTEGER {
@@ -309,6 +121,345 @@ basicType
 }
 ;
 
-void yyerror(char* s){
-    fprintf(stderr,"%s\n",s);
+CompoundStmt
+: CompoundStmt DeclStmt {
+    auto comp_stmt = unique_ptr<string>($1);
+    auto decl_stmt = unique_ptr<string>($2);
+    $$ = new string(*comp_stmt + *decl_stmt);  
+}
+| DeclStmt {
+    auto decl_stmt = unique_ptr<string>($1);
+    $$ = new string(*decl_stmt);
+}
+| CompoundStmt ReturnStmt {
+    auto comp_stmt = unique_ptr<string>($1);
+    auto ret_stmt = unique_ptr<string>($2);
+    $$ = new string(*comp_stmt + *ret_stmt);  
+}
+| ReturnStmt {
+    auto ret_stmt = unique_ptr<string>($1);
+    $$ = new string(*ret_stmt);
+}
+| CompoundStmt IfStmt {
+    auto comp_stmt = unique_ptr<string>($1);
+    auto if_stmt = unique_ptr<string>($2);
+    $$ = new string(*comp_stmt + *if_stmt);  
+}
+| IfStmt {
+    auto if_stmt = unique_ptr<string>($1);
+    $$ = new string(*if_stmt);
+}
+| CompoundStmt WhileStmt {
+    auto comp_stmt = unique_ptr<string>($1);
+    auto while_stmt = unique_ptr<string>($2);
+    $$ = new string(*comp_stmt + *while_stmt);  
+}
+| WhileStmt {
+    auto while_stmt = unique_ptr<string>($1);
+    $$ = new string(*while_stmt);
+}
+| CompoundStmt ExprStmt SEMICOLON{
+    auto comp_stmt = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($2);
+    $$ = new string(*comp_stmt + *expr_stmt + ";");  
+}
+| ExprStmt SEMICOLON{
+    auto expr_stmt = unique_ptr<string>($1);
+    $$ = new string(*expr_stmt + ";");
+}
+;
+
+ReturnStmt
+: RETURN SEMICOLON {
+    $$ = new string("return;");
+}
+| RETURN ExprStmt SEMICOLON {
+    auto expr_stmt = unique_ptr<string>($2);
+    $$ = new string("return " + *expr_stmt + ";");
+}
+;
+
+IfStmt
+: MatchedStmt{
+    auto match_stmt = unique_ptr<string>($1);
+    $$ = new string(*match_stmt);
+}
+| UnmatchedStmt{
+    auto unmatch_stmt = unique_ptr<string>($1);
+    $$ = new string(*unmatch_stmt);
+}
+;
+
+WhileStmt
+: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmt{
+    auto expr_stmt = unique_ptr<string>($3);
+    auto comp_stmt = unique_ptr<string>($5);
+    $$ = new string("while(" + *expr_stmt + ")" + *comp_stmt);
+}
+
+MatchedStmt
+: IF OPENPAREN ExprStmt CLOSEPAREN MatchedStmt ELSE MatchedStmt{
+    auto expr_stmt = unique_ptr<string>($3);
+    auto match_stmt = unique_ptr<string>($5);
+    auto smatch_stmt = unique_ptr<string>($7);
+    $$ = new string("if(" + *expr_stmt + ")" + *match_stmt + "else" + *smatch_stmt);
+}
+| OPENBRACE CompoundStmt CLOSEBRACE{
+    auto comp_stmt = unique_ptr<string>($2);
+    $$ = new string("{" + *comp_stmt + "}");
+}
+;
+
+UnmatchedStmt
+: IF OPENPAREN ExprStmt CLOSEPAREN IfStmt{
+    auto expr_stmt = unique_ptr<string>($3);
+    auto if_stmt = unique_ptr<string>($5);
+    $$ = new string("if(" + *expr_stmt + ")" + *if_stmt);
+}
+| IF OPENPAREN ExprStmt CLOSEPAREN MatchedStmt ELSE UnmatchedStmt{
+    auto expr_stmt = unique_ptr<string>($3);
+    auto match_stmt = unique_ptr<string>($5);
+    auto unmatch_stmt = unique_ptr<string>($7);
+    $$ = new string("if(" + *expr_stmt + ")" + *match_stmt + "else" + *unmatch_stmt);
+}
+;
+
+DeclStmt
+: basicType IdentifierList SEMICOLON{
+    auto type = unique_ptr<string>($1);
+    auto ident_list = unique_ptr<string>($2);
+    $$ = new string(*type + " "+ *ident_list + ";");
+}
+| basicType IDENTIFIER OPENBRACKET IntegerLiteral CLOSEBRACKET SEMICOLON{
+    auto type = unique_ptr<string>($1);
+    auto ident = unique_ptr<string>($2);
+    auto num = unique_ptr<string>($4);
+    $$ = new string(*type + " "+ *ident + "[" + *num +"]" + ";");
+}
+;
+
+ExprStmt
+: DeclRefStmt ASSIGN ExprStmt{
+    auto ref_stmt = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*ref_stmt + "=" + *expr_stmt);    
+}
+| DeclRefStmt OR ExprStmt{
+    auto ref_stmt = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*ref_stmt + "||" + *expr_stmt);
+}  
+| DeclRefStmt XOR ExprStmt{
+    auto ref_stmt = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*ref_stmt + "|" + *expr_stmt);
+}
+| DeclRefStmt AND ExprStmt{
+    auto ref_stmt = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*ref_stmt + "&&" + *expr_stmt);
+}
+| DeclRefStmt PLUS ExprStmt{
+    auto ref_stmt = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*ref_stmt + "+" + *expr_stmt);
+}
+| DeclRefStmt MINUS ExprStmt{
+    auto ref_stmt = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*ref_stmt + "-" + *expr_stmt);
+}
+| DeclRefStmt MUL ExprStmt{
+    auto ref_stmt = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*ref_stmt + "*" + *expr_stmt);
+}
+| DeclRefStmt DIV ExprStmt{
+    auto ref_stmt = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*ref_stmt + "/" + *expr_stmt);
+}
+| DeclRefStmt EQ ExprStmt{
+    auto ref_stmt = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*ref_stmt + "==" + *expr_stmt);
+}
+| DeclRefStmt NEQ ExprStmt{
+    auto ref_stmt = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*ref_stmt + "!=" + *expr_stmt);
+}
+| DeclRefStmt GRA ExprStmt{
+    auto ref_stmt = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*ref_stmt + ">" + *expr_stmt);
+}
+| DeclRefStmt LES ExprStmt{
+    auto ref_stmt = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*ref_stmt + "<" + *expr_stmt);
+}
+| DeclRefStmt GRAEQ ExprStmt{
+    auto ref_stmt = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*ref_stmt + ">=" + *expr_stmt);
+}
+| DeclRefStmt LESEQ ExprStmt{
+    auto ref_stmt = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*ref_stmt + "<=" + *expr_stmt);
+}
+| IntegerLiteral OR ExprStmt{
+    auto int_li = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*int_li + "||" + *expr_stmt);
+}  
+| IntegerLiteral XOR ExprStmt{
+    auto int_li = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*int_li + "|" + *expr_stmt);
+}
+| IntegerLiteral AND ExprStmt{
+    auto int_li = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*int_li + "&&" + *expr_stmt);
+}
+| IntegerLiteral PLUS ExprStmt{
+    auto int_li = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*int_li + "+" + *expr_stmt);
+}
+| IntegerLiteral MINUS ExprStmt{
+    auto int_li = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*int_li + "-" + *expr_stmt);
+}
+| IntegerLiteral MUL ExprStmt{
+    auto int_li = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*int_li + "*" + *expr_stmt);
+}
+| IntegerLiteral DIV ExprStmt{
+    auto int_li = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*int_li + "/" + *expr_stmt);
+}
+| IntegerLiteral EQ ExprStmt{
+    auto int_li = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*int_li + "==" + *expr_stmt);
+}
+| IntegerLiteral NEQ ExprStmt{
+    auto int_li = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*int_li + "!=" + *expr_stmt);
+}
+| IntegerLiteral GRA ExprStmt{
+    auto int_li = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*int_li + ">" + *expr_stmt);
+}
+| IntegerLiteral LES ExprStmt{
+    auto int_li = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*int_li + "<" + *expr_stmt);
+}
+| IntegerLiteral GRAEQ ExprStmt{
+    auto int_li = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*int_li + ">=" + *expr_stmt);
+}
+| IntegerLiteral LESEQ ExprStmt{
+    auto int_li = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*int_li + "<=" + *expr_stmt);
+}
+| DeclRefStmt {
+    auto ref_stmt = unique_ptr<string>($1);
+    $$ = new string(*ref_stmt);
+}
+| IntegerLiteral {
+    auto int_li = unique_ptr<string>($1);
+    $$ = new string(*int_li);
+}
+| CallStmt {
+    auto call_stmt = unique_ptr<string>($1);
+    $$ = new string(*call_stmt);
+}
+;
+
+IntegerLiteral
+: INT_CONST {
+    $$ = new string(to_string($1));
+}
+;
+
+DeclRefStmt
+: IDENTIFIER OPENBRACKET ExprStmt CLOSEBRACKET{
+    auto ident = unique_ptr<string>($1);
+    auto expr_stmt = unique_ptr<string>($3);
+    $$ = new string(*ident + "["+ *expr_stmt +"]");
+}
+| IDENTIFIER{
+    auto ident = unique_ptr<string>($1);
+    $$ = new string(*ident);
+}
+
+CallStmt
+: IDENTIFIER OPENPAREN ExprStmtList CLOSEPAREN{
+    auto call_stmt = unique_ptr<string>($1);
+    auto expr_list = unique_ptr<string>($3);
+    $$ = new string(*call_stmt + "("+ *expr_list + ")");
+}
+;
+
+ExprStmtList
+: ExprStmt {
+    auto expr_stmt = make_unique<string>($1);
+    expr_stmt_tail = expr_stmt;
+    $$ = expr_stmt;
+}
+| ExprStmtList COMMA ExprStmt{
+    auto expr_stmt = unique_ptr<string>($3);
+    expr_stmt_tail -> Next = expr_stmt;
+    expr_stmt -> Prev = expr_stmt_tail;
+    expr_stmt_tail = expr_stmt_tail -> Next;
+    $$ = $1;
+}
+;
+
+IdentifierList
+: IDENTIFIER{
+    auto ident = make_unique<string>($1);
+    ident_list = ident;
+    $$ = ident;
+}
+| IdentifierList COMMA IDENTIFIER{
+    auto ident = unique_ptr<string>($3);
+    iden_tail -> Next = ident;
+    ident -> Prev = iden_tail;
+    iden_tail = iden_tail -> Next;
+    $$ = $1;
+}
+;
+
+%%
+
+void yyerror(unique_ptr<string> &ast, const char *s) {
+  cerr << "error: " << s << endl;
+};
+
+int main() {
+  // 打开输入文件, 并且指定 lexer 在解析的时候读取这个文件
+  yyin = fopen("test.txt", "r");
+  assert(yyin);
+
+  // 调用 parser 函数, parser 函数会进一步调用 lexer 解析输入文件的
+  unique_ptr<string> ast;
+  auto ret = yyparse(ast);
+  assert(!ret);
+
+  // 输出解析得到的 AST, 其实就是个字符串
+  cout << *ast << endl;
+  return 0;
 }

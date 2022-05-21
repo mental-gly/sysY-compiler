@@ -3,6 +3,7 @@
 
 /// \file TypeInfo.h
 /// \brief TypeInfo class describe type equivalence
+#include "llvm/IR/Type.h"
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -23,7 +24,7 @@ struct TypeInfo {
 
     /// \todo set type use
     enum : uint32_t {
-        kUnkown,
+        kUnknown,
         kVoid,
         kNumeric,
         kPointer,
@@ -40,8 +41,10 @@ struct TypeInfo {
     uint32_t Kind;
     // struct type member variable types
     // If this type is defined with typedef (kAlias), parent is the original type.
-    // IF this type is a pointer (kPointer), parent is the dereferenced class. 
-    TypeInfo **Use {nullptr}; 
+    // IF this type is a pointer (kPointer), parent is the de-reference class.
+    TypeInfo **Use {nullptr};
+    // corresponding LLVM IR type.
+    llvm::Type *Type;
 };
 
 
@@ -49,30 +52,38 @@ struct TypeInfo {
 class TypeContext {
 public:
     /// \brief register primitive types.
-    static void Init();
-    static bool checkEquivalance(TypeInfo *Src, TypeInfo *Tgt); 
+    static void Init(llvm::LLVMContext *);
+    static bool checkEquivalence(TypeInfo *Src, TypeInfo *Tgt);
 
     static TypeInfo *find(const std::string &name_key);
 
-    /// \brief register numeric type with \p name and \p size
-    static TypeInfo &createNumericType(const std::string &name_key, size_t size);
+    /// \brief register numeric type with \p name and \p size.
+    static TypeInfo *createNumericType(const std::string &name_key, size_t size);
 
-    /// \brief register pointer type \p T* given type name \p T
-    static TypeInfo &createPointerType(const std::string &name_key);
+    /// \brief register pointer type \p T* given type name \p T.
+    static TypeInfo *createPointerType(const std::string &name_key);
+
+    /// \brief register array type \p T[] given type name \p T.
+    static TypeInfo *createArrayType(const std::string &name_key, size_t length);
 
     [[maybe_unused]] static TypeInfo &createStructType(const std::string &name_key, const std::vector<TypeInfo *> members) {
         LOG(FATAL) << "Struct is not supported!";
+    }
+
+    static void SetLLVMType(TypeInfo *T, llvm::Type *MapT) {
+        T->Type = MapT;
     }
 private:
     // Type table only operate at one end and
     // requires fast append and remove operation.
     static std::vector<TypeInfo> type_table;
+    static llvm::LLVMContext *context;
 };
 
 
 #define REGISTER_NUMERIC(X) TypeContext::createNumericType(#X, sizeof(X))
 #define REGISTER_POINTER(X) TypeContext::createPointerType(#X)
-
+#define REGISTER_ARRAY(X, LEN) TypeContext::createArrayType(#X, LEN)
 
 
 

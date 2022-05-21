@@ -6,18 +6,12 @@
 #endif
 
 // Standard binary operations
+// unsigned, float operation decorators is determined by type.
 BINARY_OPERATOR(Add)
-BINARY_OPERATOR(FAdd)
 BINARY_OPERATOR(Sub)
-BINARY_OPERATOR(FSub)
 BINARY_OPERATOR(Mul)
-BINARY_OPERATOR(FMul)
-BINARY_OPERATOR(UDiv)
-BINARY_OPERATOR(SDiv)
-BINARY_OPERATOR(FDiv)
-BINARY_OPERATOR(URem)
-BINARY_OPERATOR(SRem)
-BINARY_OPERATOR(FRem)
+BINARY_OPERATOR(Div)
+BINARY_OPERATOR(Rem)
 
 // Logical operations 
 BINARY_OPERATOR(Shl)  // Shift left
@@ -26,3 +20,14 @@ BINARY_OPERATOR(AShr) // Arithematic shift right
 BINARY_OPERATOR(And) 
 BINARY_OPERATOR(Or)
 BINARY_OPERATOR(Xor)
+
+// Assignment
+BINARY_OPERATOR(Assign)
+
+// Comparison
+BINARY_OPERATOR(Greater)
+BINARY_OPERATOR(Less)
+BINARY_OPERATOR(GreaterEqual)
+BINARY_OPERATOR(LessEqual)
+BINARY_OPERATOR(Equal)
+BINARY_OPERATOR(NotEqual)

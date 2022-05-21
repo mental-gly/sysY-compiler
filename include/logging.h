@@ -6,7 +6,7 @@
 #ifndef LOGGING_H
 #define LOGGING_H
 #ifndef STACK_TRACE_SIZE
-#define STACK_TRACE_SIZE 5
+#define STACK_TRACE_SIZE 8
 #endif
 
 #include <iostream>
@@ -18,7 +18,7 @@
 #include <stdexcept>
 
 
-#if NEED_LOG_STACK_TRACE & __GNUC__
+#if NEED_LOG_STACK_TRACE && __GNUC__
 // stack trace feature requires Linux execinfo syscalls
 // and -rdynamic compile flag to fetch symbols
 #include <cxxabi.h>
@@ -39,7 +39,7 @@ inline std::string BackTrace(
     char **msgs = backtrace_symbols(frame_info.data(), nframes);
     if (msgs != nullptr) {
         for (int frame = start_frame; frame < nframes; ++frame) {
-            stack_trace_os << '\t#' << frame - start_frame << ' ';
+            stack_trace_os << "\t#" << frame - start_frame << ' ';
             std::string msg(msgs[frame]);
             size_t symbol_start;
             size_t symbol_end;
@@ -57,12 +57,12 @@ inline std::string BackTrace(
                 char* demangled_symbol = abi::__cxa_demangle(symbol.c_str(), NULL, NULL, &status);
                 if (status == 0) {
                     stack_trace_os << msg.substr(0, symbol_start) 
-                                   << "\033[33m" << std::string(demangled_symbol) << "\033[0m"
+                                   << "\033[31m" << std::string(demangled_symbol) << "\033[0m"
                                    << msg.substr(symbol_end, std::string::npos) << "\n";
                     free(demangled_symbol);
-                } 
+                }
             } else {
-                    stack_trace_os << msgs[frame] << "\n";
+                stack_trace_os << msgs[frame] << "\n";
             }
         }
     }
@@ -84,7 +84,10 @@ inline std::string BackTrace(
 
 class Log {
 public:
-    Log() = default;
+    Log(const char *category, const char *file, size_t line) {
+        _M_stream << "\033[33m" << category << ": \033[0m";
+        _M_stream << file << ":" << line << ": ";
+    }
     ~Log() {
         std::cout << _M_stream.str();
     }
@@ -98,7 +101,7 @@ public:
     LogFatal() = delete;
     LogFatal(const char *file, size_t line) 
     {
-        _M_stream << "In " << file << ":" << line << ":\n\t";
+        _M_stream << "\033[1;31mFatal error: \033[0mIn " << file << ":" << line << ":\n\t";
     }
     ~LogFatal() { 
         std::cerr << _M_stream.str();
@@ -145,7 +148,8 @@ CHECK_FUNC(_NE, !=)
 
 
 #define LOG_FATAL LogFatal(__FILE__, __LINE__)
-#define LOG_INFO  Log()
+#define LOG_INFO  Log("INFO", __FILE__, __LINE__)
+#define LOG_WARNING Log("Warning", __FILE__, __LINE__)
 #define LOG(severity) LOG_##severity.stream()
 
 #endif // LOGGING_H

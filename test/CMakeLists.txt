@@ -1,20 +1,28 @@
+FILE(GLOB_RECURSE TEST_SOURCES ${PROJECT_SOURCE_DIR}/test/*test.cc)
 
-# add_executable(symbol_table_test symbol_table_test.cc)
-# Set test target properties and dependencies.
-# set_target_properties(symbol_table_test
-#         PROPERTIES
-#         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test"
-#         COMMAND symbol_table_test
-#         )
-# add_test(symbol_table_test ${CMAKE_BINARY_DIR}/test/symbol_table_test)
+llvm_map_components_to_libnames(LLVM_LIBS support core)
 
+foreach (test_source ${TEST_SOURCES})
+    # Create test suit
+    get_filename_component(test_filename ${test_source} NAME)
+    string(REPLACE ".cc" "" test_name ${test_filename})
+    MESSAGE(STATUS "Create test suit: ${test_name}")
 
-add_executable(type_test type_test.cc)
-# Set test target properties and dependencies.
-set_target_properties(type_test
-        PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test"
-        COMMAND type_test
-        )
-target_link_libraries(type_test PRIVATE AST)
-add_test(type_test ${CMAKE_BINARY_DIR}/test/type_test)
+    # Add the test target separately and as part of "make check-tests".
+    add_executable(${test_name} EXCLUDE_FROM_ALL ${test_source})
+
+    # Set test target properties and dependencies.
+    set_target_properties(${test_name}
+            PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test"
+            COMMAND ${test_name}
+            )
+
+    # Add the test under CTest.
+    add_test(${test_name} ${CMAKE_BINARY_DIR}/test/${test_name})
+endforeach (test_source ${TEST_SOURCES})
+
+target_link_libraries(symbol_table_test ${LLVM_LIBS})
+target_link_libraries(ilist_test ${LLVM_LIBS})
+target_link_libraries(prototype_test ${LLVM_LIBS})
+target_link_libraries(if_test AST ${LLVM_LIBS})

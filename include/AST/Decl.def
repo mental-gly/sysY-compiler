@@ -1,0 +1,12 @@
+#ifndef HANDLE_AST_DECL
+#define HANDLE_AST_DECL(X) X 
+#endif 
+
+// declarations 
+HANDLE_AST_DECL(CompileUnitDecl)
+HANDLE_AST_DECL(FunctionDecl)
+HANDLE_AST_DECL(VarDecl)
+HANDLE_AST_DECL(ParamDecl)
+HANDLE_AST_DECL(TypeDecl)
+
+#undef HANDLE_AST_DECL

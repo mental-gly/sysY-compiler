@@ -1,25 +1,32 @@
 #include "AST/TypeInfo.h"
-
+#include "llvm/IR/DerivedTypes.h"
+#include <sstream>
+using namespace llvm;
 std::vector<TypeInfo> TypeContext::type_table;
+LLVMContext *TypeContext::context = nullptr;
 
-void TypeContext::Init(){
+void TypeContext::Init(LLVMContext *Context){
+    // Set LLVM Context.
+    context = Context;
     // special type
-    TypeContext::type_table.emplace_back("void", 0, TypeInfo::kVoid);
+    TypeContext::type_table.emplace_back(
+        std::hash<std::string>()("void"), 0, TypeInfo::kVoid);
+    SetLLVMType(&type_table.back(), Type::getVoidTy(*context));
     // register primitive numeric types
-    REGISTER_NUMERIC(float);   
-    REGISTER_NUMERIC(double);
-    REGISTER_NUMERIC(char);
-    REGISTER_NUMERIC(unsigned char);
-    REGISTER_NUMERIC(short);
-    REGISTER_NUMERIC(unsigned short);
-    REGISTER_NUMERIC(int);
-    REGISTER_NUMERIC(unsigned int);
-    REGISTER_NUMERIC(long long);
-    REGISTER_NUMERIC(unsigned long long);
+    SetLLVMType(REGISTER_NUMERIC(float),             Type::getFloatTy(*context));
+    SetLLVMType(REGISTER_NUMERIC(double),            Type::getDoubleTy(*context));
+    SetLLVMType(REGISTER_NUMERIC(char),              Type::getInt8Ty(*context));
+    SetLLVMType(REGISTER_NUMERIC(unsigned char),     Type::getInt8Ty(*context));
+    SetLLVMType(REGISTER_NUMERIC(short),             Type::getInt16Ty(*context));
+    SetLLVMType(REGISTER_NUMERIC(unsigned short),    Type::getInt16Ty(*context));
+    SetLLVMType(REGISTER_NUMERIC(int),               Type::getInt32Ty(*context));
+    SetLLVMType(REGISTER_NUMERIC(unsigned int),      Type::getInt32Ty(*context));
+    SetLLVMType(REGISTER_NUMERIC(long long),         Type::getInt64Ty(*context));
+    SetLLVMType(REGISTER_NUMERIC(unsigned long long),Type::getInt64Ty(*context));
 }
 
 
-bool TypeContext::checkEquivalance(TypeInfo *Src, TypeInfo *Tgt) {
+bool TypeContext::checkEquivalence(TypeInfo *Src, TypeInfo *Tgt) {
     switch (Src->Kind) {
         // primitive type 
         case TypeInfo::kNumeric:
@@ -46,18 +53,47 @@ TypeInfo *TypeContext::find(const std::string &name_key) {
     else return nullptr;
 }
 
-TypeInfo &TypeContext::createNumericType(const std::string &name_key, size_t size) {
+TypeInfo *TypeContext::createNumericType(const std::string &name_key, size_t size) {
+    auto type = find(name_key);
+    if (type != nullptr) return type;
     type_table.emplace_back(std::hash<std::string>()(name_key), 
                             size, TypeInfo::kNumeric);
-    return type_table.back();
+    return &type_table.back();
 }
 
-TypeInfo &TypeContext::createPointerType(const std::string &name_key) {
+TypeInfo *TypeContext::createPointerType(const std::string &name_key) {
+    std::ostringstream PointerOs;
+    PointerOs << name_key << "*";
+    auto type = find(PointerOs.str());
+    if (type != nullptr) return type;
     auto base_type = find(name_key);
     CHECK(base_type) << "Unknown type " << name_key;
-    type_table.emplace_back(std::hash<std::string>()(name_key + "*"),
+    type_table.emplace_back(std::hash<std::string>()(PointerOs.str()),
                             sizeof(void*), TypeInfo::kPointer);
-    auto new_type = type_table.back();
-    new_type.Use[0] = base_type;
+    auto new_type = &type_table.back();
+    new_type->Use[0] = base_type;
+    return new_type;
+}
+
+TypeInfo *TypeContext::createArrayType(const std::string &name_key, size_t Length) {
+    // construct array type name
+    std::ostringstream ArrayOs;
+    ArrayOs << name_key << "[" << Length << "]";
+    auto type = find(ArrayOs.str());
+    if (type != nullptr) return type;
+    // register new type.
+    auto base_type = find(name_key);
+    CHECK(base_type) << "Unknown type " << name_key;
+    type_table.emplace_back(std::hash<std::string>()(ArrayOs.str()),
+                            sizeof(base_type->ByteSize * Length), TypeInfo::kArrays);
+    auto new_type = &type_table.back();
+    new_type->Use[0] = base_type;
+
+    if (Length > 0)
+        // A true array type.
+        SetLLVMType(new_type, ArrayType::get(base_type->Type, Length));
+    else
+        // A function parameter type, treat as pointer.
+        SetLLVMType(new_type, PointerType::get(base_type->Type, 0));
     return new_type;
 }

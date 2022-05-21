@@ -1,11 +1,11 @@
-if (BUILD_WITH_LLVM)
-llvm_map_componenets_to_libnames(LLVM_LIBS 
-    support core 
-    asmprinter selectiondag codegen target mc)
-endif()
+llvm_map_components_to_libnames(LLVM_LIBS
+    support core
+)
 
 set(AST_SOURCES
-    TypeInfo.cc
+        TypeInfo.cc
+        Stmt.cc
+        Decl.cc
 )
 
 add_library(AST STATIC ${AST_SOURCES})

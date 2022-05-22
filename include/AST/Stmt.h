@@ -6,7 +6,6 @@
 ///
 /// Refer to Clang AST Stmt & Decl designs.
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/APFixedPoint.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/APSInt.h"
@@ -353,6 +352,22 @@ protected:
     // llvm::APFloat support convertXXX for casting.
     // llvm::IEEEFloat also works
     llvm::APFloat Value;
+};
+
+
+class StringLiteral : public ExprStmt {
+    uint8_t SubClassID { Stmt::kStringLiteral };
+public:
+    StringLiteral() = delete;
+    StringLiteral(const std::string);
+public:
+    TypeInfo *getType(CompileUnitDecl *U) override {
+        return TypeContext::find("char*");
+    }
+    llvm::StringRef getVal() const { return Literal; }
+    llvm::Value *CodeGen(CompileUnitDecl *) override;
+private:
+    std::string Literal;
 };
 
 #endif // AST_H 

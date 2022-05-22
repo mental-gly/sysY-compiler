@@ -25,6 +25,7 @@ HANDLE_AST_STMT_EXPR(DeclRefStmt)
 HANDLE_AST_STMT_EXPR(BinaryOperator)
 HANDLE_AST_STMT_EXPR(IntegerLiteral)
 HANDLE_AST_STMT_EXPR(FloatingLiteral)
+HANDLE_AST_STMT_EXPR(StringLiteral)
 
 
 #undef HANDLE_AST_STMT

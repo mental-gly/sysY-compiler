@@ -423,3 +423,16 @@ double FloatingLiteral::getVal() const {
 Value *FloatingLiteral::CodeGen(CompileUnitDecl *U) {
     return ConstantFP::get(*U->getContext(), Value);
 }
+
+//===-- StringLiteral --===//
+
+::StringLiteral::StringLiteral(const std::string Literal)
+    : Literal(Literal) { }
+
+Value *::StringLiteral::CodeGen(CompileUnitDecl *U) {
+    auto context = U->getContext();
+    auto module = U->getModule();
+    auto builder = U->getBuilder();
+    auto ConstStringArray = builder->CreateGlobalString(Literal.c_str(), llvm::StringRef(Literal), 0, module);
+    return ConstStringArray;
+}

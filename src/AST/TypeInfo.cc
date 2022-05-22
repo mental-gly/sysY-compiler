@@ -23,6 +23,8 @@ void TypeContext::Init(LLVMContext *Context){
     SetLLVMType(REGISTER_NUMERIC(unsigned int),      Type::getInt32Ty(*context));
     SetLLVMType(REGISTER_NUMERIC(long long),         Type::getInt64Ty(*context));
     SetLLVMType(REGISTER_NUMERIC(unsigned long long),Type::getInt64Ty(*context));
+    // String Literal char *
+    SetLLVMType(REGISTER_POINTER(char),              Type::getInt8PtrTy(*context));
 }
 
 

@@ -71,7 +71,7 @@ TypeInfo *TypeContext::createPointerType(const std::string &name_key) {
     auto base_type = find(name_key);
     CHECK(base_type) << "Unknown type " << name_key;
     type_table.emplace_back(std::hash<std::string>()(PointerOs.str()),
-                            sizeof(void*), TypeInfo::kPointer);
+                            sizeof(void*), TypeInfo::kPointer, 1);
     auto new_type = &type_table.back();
     new_type->Use[0] = base_type;
     return new_type;

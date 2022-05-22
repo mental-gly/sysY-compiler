@@ -18,10 +18,9 @@ foreach (test_source ${TEST_SOURCES})
             RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test"
             COMMAND ${test_name}
             )
-    target_link_libraries(${test_name} ${LLVM_LIBS})
+    target_link_libraries(${test_name} AST ${LLVM_LIBS})
     # Add the test under CTest.
     add_test(${test_name} ${CMAKE_BINARY_DIR}/test/${test_name})
 endforeach (test_source ${TEST_SOURCES})
 
-target_link_libraries(if_test AST)
-target_link_libraries(StringLiteral_test AST ${LLVM_ANALYSIS})
+target_link_libraries(StringLiteral_test ${LLVM_ANALYSIS})

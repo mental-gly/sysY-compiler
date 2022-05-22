@@ -38,14 +38,23 @@ Value *CompoundStmt::CodeGen(CompileUnitDecl *U) {
     // Compoundstmt inside is a new scope,
     // Which is managed by CompoundStmt.
     U->Symbol.CreateScope();
-    ReturnInst *RetInstTrack;
+    Value *RetInstTrack = nullptr;
+    auto context = U->getContext();
+    auto builder = U->getBuilder();
     for (auto SubStmt : Stmts) {
-        SubStmt->CodeGen(U);
+        RetInstTrack = SubStmt->CodeGen(U);
+        if (RetInstTrack != nullptr && isa<ReturnInst>(RetInstTrack)) break;
         // optimization : ignore statements after ret.
-        if (!ReturnStmt::classof(SubStmt)) break;
+        if (!ReturnStmt::classof(SubStmt)) {
+            // auto F = builder->GetInsertBlock()->getParent();
+            // auto BB = BasicBlock::Create(*context,"", F);
+            // builder->CreateBr(BB);
+            // builder->SetInsertPoint(BB);
+            break;
+        }
     }
     U->Symbol.LeaveScope();
-    return nullptr;
+    return RetInstTrack;
 }
 
 //===-- IfStmt --===//
@@ -230,12 +239,22 @@ TypeInfo *ArraySubscriptStmt::getType(CompileUnitDecl *U) {
 
 Value *ArraySubscriptStmt::CodeGen(CompileUnitDecl *U) {
     auto builder = U->getBuilder();
+    auto context = U->getContext();
     auto BaseVal = Base->CodeGen(U);
     auto IdxVal = Base->CodeGen(U);
     CHECK(BaseVal->getType()->isArrayTy() || BaseVal->getType()->isPointerTy())
         << "'" << reinterpret_cast<DeclRefStmt *>(BaseVal)->getSymbolName().str() << "'"
         << " should be an array or a pointer type";
-    return builder->CreateGEP(BaseVal, IdxVal);
+    if (BaseVal->getType()->isArrayTy())
+        return builder->CreateGEP(BaseVal, IdxVal);
+    if (BaseVal->getType()->isPointerTy()) {
+        if (BaseVal->getType()->getPointerElementType()->isSingleValueType())
+            return builder->CreateGEP(BaseVal->getType(), BaseVal, IdxVal);
+        if (BaseVal->getType()->getPointerElementType()->isArrayTy())
+            return builder->CreateGEP(BaseVal,
+                                      {ConstantInt::get(Type::getInt64Ty(*context), 0),
+                                      IdxVal});
+    }
 }
 
 //===-- ReturnStmt --===//
@@ -249,8 +268,7 @@ Value *ReturnStmt::CodeGen(CompileUnitDecl *U) {
     // any internal return br to this final BB.
     auto builder = U->getBuilder();
     llvm::Value *RetV = RetExpr->CodeGen(U);
-    builder->CreateRet(RetV);
-    return nullptr;
+    return builder->CreateRet(RetV);
 }
 
 

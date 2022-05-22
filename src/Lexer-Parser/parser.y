@@ -7,11 +7,30 @@
 }
 
 %{
+#include <memory>
+#include <string>
 #include <cassert>
 #include <cstdio>
 #include <iostream>
+#include "AST/Decl.h"
+#include "AST/Stmt.h"
+#include "AST/TypeInfo.h"
 
-
+class CompileUnitDecl;
+class VarDecl;
+class Stmt;
+class DeclStmt;
+class IfStmt;
+class ForStmt;
+class WhileStmt;
+class CompoundStmt;
+class ExprStmt;
+class CallStmt;
+class ArraySubscriptStmt;
+class DeclRefStmt;
+class BinaryOperatorStmt;
+class IntegerLiteral;
+class FloatingLiteral;
 
 using namespace std;
 
@@ -19,11 +38,11 @@ int yylex();
 void yyerror(CompileUnitDecl& comp_unit, const char *s);
 extern FILE* yyin;
 
-static FunctionDecl *func_decl_tail;
-static ParamDecl *param_decl_tail;
-static ExprStmt *expr_stmt_tail;
-static CompoundStmt *comp_stmt_tail;
-static VarDecl *iden_tail;
+static Decl *func_decl_tail;
+static Decl *param_decl_tail;
+static Stmt *expr_stmt_tail;
+static Stmt *comp_stmt_tail;
+static Decl *iden_tail;
 %}
 
 %parse-param { CompileUnitDecl& comp_unit }
@@ -34,11 +53,22 @@ static VarDecl *iden_tail;
   TypeInfo* type_info_val;
   Stmt* stmt_val;
   Decl* decl_val;
+  FunctionDecl* func_val;
+  ParamDecl* param_val;
+  VarDecl* ident_val;
+  CompileUnitDecl* comp_val;
+  IntegerLiteral* li_val;
+  DeclStmt* declstmt_val;
 }
 
 %type <str_val> basicType 
-%type <decl_val> FunctionDecl ParamList ParamDecl IdentifierList CompileUnit Program
-%type <stmt_val> CompoundStmtList DeclStmt ReturnStmt ExprStmt DeclRefStmt IntegerLiteral CallStmt ExprStmtList IfStmt MatchedStmt UnmatchedStmt WhileStmt Block
+%type <func_val> FunctionDecl CompileUnit
+%type <param_val> ParamList ParamDecl 
+%type <ident_val> IdentifierList 
+%type <comp_val> Program
+%type <stmt_val> CompoundStmtList ReturnStmt ExprStmt DeclRefStmt CallStmt ExprStmtList IfStmt MatchedStmt UnmatchedStmt WhileStmt Block
+%type <li_val> IntegerLiteral
+%type <declstmt_val> DeclStmt
 %token T_CHAR T_INT T_STRING T_BOOL T_VOID
 %token COMMA SEMICOLON OPENPAREN CLOSEPAREN OPENBRACE CLOSEBRACE OPENBRACKET CLOSEBRACKET
 %token ADDR
@@ -64,14 +94,14 @@ Program
 
 CompileUnit
 : CompileUnit FunctionDecl{
-    auto func_decl = make_unique<FunctionDecl>($2);
+    auto func_decl = $2;
     func_decl_tail -> Next = func_decl;
     func_decl -> Prev = func_decl_tail;
     func_decl_tail = func_decl_tail -> Next;
     $$ = $1;
 }
 | FunctionDecl{
-    auto func_decl = make_unique<FunctionDecl>($1);
+    auto func_decl =  $1;
     func_decl_tail = func_decl;
     $$ = func_decl;
 }
@@ -83,14 +113,14 @@ FunctionDecl
     auto ident = $2;
     auto param_list = $4;
     auto block = $6;
-    $$ = new FunctionDecl(TypeContext::find(*type), *ident, param_list);
+    $$ = new FunctionDecl(TypeContext::find(*type), *ident, static_cast<ParamDecl*>(param_list));
     $$ -> setBody(block);
 } 
 | basicType IDENTIFIER OPENPAREN ParamList CLOSEPAREN SEMICOLON{
     auto type = $1;
     auto ident = $2;
     auto param_list = $4;
-    $$ = new FunctionDecl(TypeContext::find(*type), *ident, param_list);
+    $$ = new FunctionDecl(TypeContext::find(*type), *ident, static_cast<ParamDecl*>(param_list));
 }
 ;
 
@@ -161,7 +191,7 @@ CompoundStmtList
 | CompoundStmtList ReturnStmt {
     auto ret_stmt = $2;
     comp_stmt_tail -> Next = ret_stmt;
-    ref_stmt -> Prev = comp_stmt_tail;
+    ret_stmt -> Prev = comp_stmt_tail;
     comp_stmt_tail = comp_stmt_tail -> Next;
     $$ = $1; 
 }
@@ -211,7 +241,7 @@ CompoundStmtList
 ReturnStmt
 : RETURN ExprStmt SEMICOLON {
     auto expr_stmt = $2;
-    $$ = new ReturnStmt(expr_stmt);
+    $$ = new ReturnStmt(static_cast<ExprStmt*>(expr_stmt));
 }
 ;
 
@@ -229,14 +259,14 @@ MatchedStmt
     auto expr_stmt = $3;
     auto match_stmt = $5;
     auto smatch_stmt = $7;
-    $$ = new IfStmt(expr_stmt, match_stmt, smatch_stmt);
+    $$ = new IfStmt(static_cast<ExprStmt*>(expr_stmt), match_stmt, smatch_stmt);
 }
 
 UnmatchedStmt
 : IF OPENPAREN ExprStmt CLOSEPAREN Block{
     auto expr_stmt = $3;
     auto match_stmt = $5;
-    $$ = new IfStmt(expr_stmt, match_stmt);
+    $$ = new IfStmt(static_cast<ExprStmt*>(expr_stmt), match_stmt);
 }
 ;
 
@@ -244,7 +274,7 @@ WhileStmt
 : WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList{
     auto expr_stmt = $3;
     auto comp_stmt = $5;
-    $$ = new WhileStmt(expr_stmt, comp_stmt);
+    $$ = new WhileStmt(static_cast<ExprStmt*>(expr_stmt), comp_stmt);
 }
 
 DeclStmt
@@ -265,143 +295,140 @@ DeclStmt
 ;
 
 ExprStmt
-: {
-    $$ = new ExprStmt();
-}
-| DeclRefStmt ASSIGN ExprStmt{
+: DeclRefStmt ASSIGN ExprStmt{
     auto ref_stmt = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Assign, ref_stmt, expr_stmt);    
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Assign, static_cast<ExprStmt*>(ref_stmt), static_cast<ExprStmt*>(expr_stmt));    
 }
 | DeclRefStmt OR ExprStmt{
     auto ref_stmt = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Or, ref_stmt, expr_stmt);  
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Or, static_cast<ExprStmt*>(ref_stmt), static_cast<ExprStmt*>(expr_stmt));  
 }  
 | DeclRefStmt XOR ExprStmt{
     auto ref_stmt = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Xor, ref_stmt, expr_stmt);  
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Xor, static_cast<ExprStmt*>(ref_stmt), static_cast<ExprStmt*>(expr_stmt));  
 }
 | DeclRefStmt AND ExprStmt{
     auto ref_stmt = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::And, ref_stmt, expr_stmt);  
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::And, static_cast<ExprStmt*>(ref_stmt), static_cast<ExprStmt*>(expr_stmt));  
 }
 | DeclRefStmt PLUS ExprStmt{
     auto ref_stmt = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Add, ref_stmt, expr_stmt);  
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Add, static_cast<ExprStmt*>(ref_stmt), static_cast<ExprStmt*>(expr_stmt));  
 }
 | DeclRefStmt MINUS ExprStmt{
     auto ref_stmt = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Sub, ref_stmt, expr_stmt);  
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Sub, static_cast<ExprStmt*>(ref_stmt), static_cast<ExprStmt*>(expr_stmt));  
 }
 | DeclRefStmt MUL ExprStmt{
     auto ref_stmt = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Mul, ref_stmt, expr_stmt);  
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Mul, static_cast<ExprStmt*>(ref_stmt), static_cast<ExprStmt*>(expr_stmt));  
 }
 | DeclRefStmt DIV ExprStmt{
     auto ref_stmt = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Div, ref_stmt, expr_stmt);  
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Div, static_cast<ExprStmt*>(ref_stmt), static_cast<ExprStmt*>(expr_stmt));  
 }
 | DeclRefStmt EQ ExprStmt{
     auto ref_stmt = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Equal, ref_stmt, expr_stmt);  
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Equal, static_cast<ExprStmt*>(ref_stmt), static_cast<ExprStmt*>(expr_stmt));  
 }
 | DeclRefStmt NEQ ExprStmt{
     auto ref_stmt = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::NotEqual, ref_stmt, expr_stmt);  
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::NotEqual, static_cast<ExprStmt*>(ref_stmt), static_cast<ExprStmt*>(expr_stmt));  
 }
 | DeclRefStmt GRA ExprStmt{
     auto ref_stmt = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Greater, ref_stmt, expr_stmt);  
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Greater, static_cast<ExprStmt*>(ref_stmt), static_cast<ExprStmt*>(expr_stmt));  
 }
 | DeclRefStmt LES ExprStmt{
     auto ref_stmt = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Less, ref_stmt, expr_stmt);  
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Less, static_cast<ExprStmt*>(ref_stmt), static_cast<ExprStmt*>(expr_stmt));  
 }
 | DeclRefStmt GRAEQ ExprStmt{
     auto ref_stmt = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::GreaterEqual, ref_stmt, expr_stmt);  
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::GreaterEqual, static_cast<ExprStmt*>(ref_stmt), static_cast<ExprStmt*>(expr_stmt));  
 }
 | DeclRefStmt LESEQ ExprStmt{
     auto ref_stmt = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::LessEqual, ref_stmt, expr_stmt);  
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::LessEqual, static_cast<ExprStmt*>(ref_stmt), static_cast<ExprStmt*>(expr_stmt));  
 }
 | IntegerLiteral OR ExprStmt{
     auto int_li = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Or, int_li, expr_stmt);  
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Or, static_cast<ExprStmt*>(int_li), static_cast<ExprStmt*>(expr_stmt));  
 }  
 | IntegerLiteral XOR ExprStmt{
     auto int_li = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Xor, int_li, expr_stmt);
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Xor, static_cast<ExprStmt*>(int_li), static_cast<ExprStmt*>(expr_stmt));
 }
 | IntegerLiteral AND ExprStmt{
     auto int_li = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::And, int_li, expr_stmt);
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::And, static_cast<ExprStmt*>(int_li), static_cast<ExprStmt*>(expr_stmt));
 }
 | IntegerLiteral PLUS ExprStmt{
     auto int_li = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Add, int_li, expr_stmt);
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Add, static_cast<ExprStmt*>(int_li), static_cast<ExprStmt*>(expr_stmt));
 }
 | IntegerLiteral MINUS ExprStmt{
     auto int_li = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Sub, int_li, expr_stmt);
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Sub, static_cast<ExprStmt*>(int_li), static_cast<ExprStmt*>(expr_stmt));
 }
 | IntegerLiteral MUL ExprStmt{
     auto int_li = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Mul, int_li, expr_stmt);
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Mul, static_cast<ExprStmt*>(int_li), static_cast<ExprStmt*>(expr_stmt));
 }
 | IntegerLiteral DIV ExprStmt{
     auto int_li = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Div, int_li, expr_stmt);
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Div, static_cast<ExprStmt*>(int_li), static_cast<ExprStmt*>(expr_stmt));
 }
 | IntegerLiteral EQ ExprStmt{
     auto int_li = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Equal, int_li, expr_stmt);
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Equal, static_cast<ExprStmt*>(int_li), static_cast<ExprStmt*>(expr_stmt));
 }
 | IntegerLiteral NEQ ExprStmt{
     auto int_li = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::NotEqual, int_li, expr_stmt);
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::NotEqual, static_cast<ExprStmt*>(int_li), static_cast<ExprStmt*>(expr_stmt));
 }
 | IntegerLiteral GRA ExprStmt{
     auto int_li = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Greater, int_li, expr_stmt);
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Greater, static_cast<ExprStmt*>(int_li), static_cast<ExprStmt*>(expr_stmt));
 }
 | IntegerLiteral LES ExprStmt{
     auto int_li = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Less, int_li, expr_stmt);
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::Less, static_cast<ExprStmt*>(int_li), static_cast<ExprStmt*>(expr_stmt));
 }
 | IntegerLiteral GRAEQ ExprStmt{
     auto int_li = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::GreaterEqual, int_li, expr_stmt);
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::GreaterEqual, static_cast<ExprStmt*>(int_li), static_cast<ExprStmt*>(expr_stmt));
 }
 | IntegerLiteral LESEQ ExprStmt{
     auto int_li = $1;
     auto expr_stmt = $3;
-    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::LessEqual, int_li, expr_stmt);
+    $$ = new BinaryOperatorStmt(BinaryOperatorStmt::LessEqual, static_cast<ExprStmt*>(int_li), static_cast<ExprStmt*>(expr_stmt));
 }
 | DeclRefStmt {
     $$ = $1;
@@ -427,7 +454,7 @@ DeclRefStmt
     auto ident = $1;
     auto base = new DeclRefStmt(*ident);
     auto expr_stmt = $3;
-    $$ = new ArraySubscriptStmt(base, expr_stmt);
+    $$ = new ArraySubscriptStmt(base, static_cast<ExprStmt*>(expr_stmt));
 }
 | IDENTIFIER{
     auto ident = $1;
@@ -438,7 +465,7 @@ CallStmt
 : IDENTIFIER OPENPAREN ExprStmtList CLOSEPAREN{
     auto ident = $1;
     auto expr_list = $3;
-    $$ = new CallStmt(*ident, expr_list);
+    $$ = new CallStmt(*ident, static_cast<ExprStmt*>(expr_list));
 }
 ;
 
@@ -476,6 +503,6 @@ IdentifierList
 
 %%
 
-void yyerror(CompileUnitDecl& comp_unit, const char *s); {
+void yyerror(CompileUnitDecl& comp_unit, const char *s){
   cerr << "error: " << s << endl;
 };

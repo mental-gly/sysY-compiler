@@ -39,6 +39,9 @@ public:
 public:
     unsigned getDeclID() const { return SubClassID; }
     llvm::StringRef getName() const { return Name; }
+#if !defined(NDEBUG)
+    virtual void dump() = 0;
+#endif
 protected:
     std::string Name;
 };
@@ -62,7 +65,9 @@ public:
     /// \brief Dump the CompileUnit.
     void print() const;
     void CodeGen();
-
+#if !defined(NDEBUG)
+    void dump() override;
+#endif
     SymbolTable<llvm::Value *> Symbol;
 private:
     llvm::SmallVector<Decl *, 10> Decls;
@@ -116,6 +121,9 @@ public:
     static bool classof(const Decl *D) {
         return D->getDeclID() == Decl::kVarDecl;
     }
+#if !defined(NDEBUG)
+    void dump() override;
+#endif
 private:
     // initialize expression.
     ExprStmt *init_expr;
@@ -148,7 +156,9 @@ public:
     static bool classof(const Decl *D) {
         return D->getDeclID() == Decl::kParamDecl;
     }
-
+#if !defined(NDEBUG)
+    void dump() override;
+#endif
 };
 
 
@@ -178,6 +188,9 @@ public:
     static bool classof(const Decl *D) {
         return D->getDeclID() == Decl::kFunctionDecl;
     }
+#if !defined(NDEBUG)
+    void dump() override;
+#endif
 private:
     llvm::SmallVector<ParamDecl *, 10> Params;
     // The body is usually a {} braced `CompoundStmt`.

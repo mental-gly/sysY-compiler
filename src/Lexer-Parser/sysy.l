@@ -5,7 +5,7 @@
 %{
 	#include <cstdlib>
 	#include <string>
-	#include "sysy.tab.hpp"
+	#include "sysy.tab.hh"
 
 	using namespace std;
 %}

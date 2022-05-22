@@ -6,6 +6,7 @@ set(AST_SOURCES
         TypeInfo.cc
         Stmt.cc
         Decl.cc
+        dump.cc
 )
 
 add_library(AST STATIC ${AST_SOURCES})

@@ -4,6 +4,7 @@
 /// \file TypeInfo.h
 /// \brief TypeInfo class describe type equivalence
 #include "llvm/IR/Type.h"
+#include "llvm/IR/LLVMContext.h"
 #include <cstddef>
 #include <cstdint>
 #include <vector>

@@ -23,6 +23,8 @@ void TypeContext::Init(LLVMContext *Context){
     SetLLVMType(REGISTER_NUMERIC(unsigned int),      Type::getInt32Ty(*context));
     SetLLVMType(REGISTER_NUMERIC(long long),         Type::getInt64Ty(*context));
     SetLLVMType(REGISTER_NUMERIC(unsigned long long),Type::getInt64Ty(*context));
+    // String Literal char *
+    SetLLVMType(REGISTER_POINTER(char),              Type::getInt8PtrTy(*context));
 }
 
 
@@ -69,7 +71,7 @@ TypeInfo *TypeContext::createPointerType(const std::string &name_key) {
     auto base_type = find(name_key);
     CHECK(base_type) << "Unknown type " << name_key;
     type_table.emplace_back(std::hash<std::string>()(PointerOs.str()),
-                            sizeof(void*), TypeInfo::kPointer);
+                            sizeof(void*), TypeInfo::kPointer, 1);
     auto new_type = &type_table.back();
     new_type->Use[0] = base_type;
     return new_type;

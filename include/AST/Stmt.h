@@ -354,4 +354,20 @@ protected:
     llvm::APFloat Value;
 };
 
+
+class StringLiteral : public ExprStmt {
+    uint8_t SubClassID { Stmt::kStringLiteral };
+public:
+    StringLiteral() = delete;
+    StringLiteral(const std::string);
+public:
+    TypeInfo *getType(CompileUnitDecl *U) override {
+        return TypeContext::find("char*");
+    }
+    llvm::StringRef getVal() const { return Literal; }
+    llvm::Value *CodeGen(CompileUnitDecl *) override;
+private:
+    std::string Literal;
+};
+
 #endif // AST_H 

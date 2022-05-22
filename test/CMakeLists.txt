@@ -1,6 +1,7 @@
 FILE(GLOB_RECURSE TEST_SOURCES ${PROJECT_SOURCE_DIR}/test/*test.cc)
 
 llvm_map_components_to_libnames(LLVM_LIBS support core)
+llvm_map_components_to_libnames(LLVM_ANALYSIS analysis)
 
 foreach (test_source ${TEST_SOURCES})
     # Create test suit
@@ -17,12 +18,9 @@ foreach (test_source ${TEST_SOURCES})
             RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test"
             COMMAND ${test_name}
             )
-
+    target_link_libraries(${test_name} AST ${LLVM_LIBS})
     # Add the test under CTest.
     add_test(${test_name} ${CMAKE_BINARY_DIR}/test/${test_name})
 endforeach (test_source ${TEST_SOURCES})
 
-target_link_libraries(symbol_table_test ${LLVM_LIBS})
-target_link_libraries(ilist_test ${LLVM_LIBS})
-target_link_libraries(prototype_test ${LLVM_LIBS})
-target_link_libraries(if_test AST ${LLVM_LIBS})
+target_link_libraries(StringLiteral_test ${LLVM_ANALYSIS})

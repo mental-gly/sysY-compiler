@@ -47,9 +47,8 @@ void CompileUnitDecl::CodeGen() {
     }
 }
 
-
-void CompileUnitDecl::print() {
-     getModule()->print(llvm::outs(), nullptr); 
+void CompileUnitDecl::print() const {
+    Module->print(llvm::outs(), nullptr);
 }
 
 //===-- FunctionDecl --===//
@@ -82,6 +81,8 @@ static void doRARWS(llvm::IRBuilder<> *builder, llvm::Function *F) {
     auto RetName = llvm::Twine(F->getName(), "ret");
     llvm::SmallVector<char, 10> Name;
     auto RetValAddr = F->getValueSymbolTable()->lookup(RetName.toStringRef(Name));
+    auto RetT = F->getReturnType();
+    llvm::SmallVector<llvm::Instruction *, 10> WorkList;
     // iterating over instructions in the Function.
     for (auto I = llvm::inst_begin(F), E = llvm::inst_end(F); I != E; ++I) {
         if (llvm::isa<llvm::ReturnInst>(&*I)) {

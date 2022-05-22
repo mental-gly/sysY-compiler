@@ -3,10 +3,11 @@
 #include <iostream>
 #include <memory>
 #include <string>
-#include "logging.h"
+
 #include "AST/Decl.h"
 #include "AST/Stmt.h"
 #include "AST/TypeInfo.h"
+#include "logging.h"
 
 using namespace std;
 

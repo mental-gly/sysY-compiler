@@ -51,6 +51,19 @@ void CompileUnitDecl::print() const {
     Module->print(llvm::outs(), nullptr);
 }
 
+//===-- VarDecl --===//
+llvm::Value *VarDecl::CodeGen(CompileUnitDecl *U) {
+    auto builder = U->getBuilder();
+    auto context = U->getContext();
+    auto F = builder->GetInsertBlock()->getParent();
+    auto EntryBB = &F->getEntryBlock();
+    auto EntryTerminator = EntryBB->getTerminator();
+    auto CurBB = builder->GetInsertBlock();
+    // make local variable alloca.
+    builder->SetInsertPoint(EntryTerminator);
+    builder->CreateAlloca(getType()->Type, 0, Name);
+}
+
 //===-- FunctionDecl --===//
 
 FunctionDecl::FunctionDecl(TypeInfo *return_type, const std::string &name, ParamDecl *params)

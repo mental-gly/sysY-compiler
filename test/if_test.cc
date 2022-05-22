@@ -42,6 +42,7 @@ int main() {
     F2->setBody(new CompoundStmt);
     Unit->CreateSubDecls(F);
     Unit->CreateSubDecls(F2);
+    Unit->dump();
     Unit->CodeGen();
     Unit->print();
 }

@@ -58,12 +58,15 @@ public:
     }
 public: 
     virtual llvm::Value *CodeGen(CompileUnitDecl *) = 0;
+#if !defined(NDEBUG)
+    virtual void dump() = 0;
+#endif
 };
 
 /// \brief DeclStmt has a single or multiple decls,
 /// We assume child VarDecl has the same type.
 /// \code int a, b, c=1; double d;
-class DeclStmt : public Stmt {
+class DeclStmt final : public Stmt {
     using DeclListTy = llvm::SmallVectorImpl<VarDecl *>;
     uint8_t SubClassID { Stmt::kDeclStmt };
 public:
@@ -81,6 +84,9 @@ public:
     static bool classof(Stmt *S) {
         return S->getStmtID() == Stmt::kDeclStmt;
     }
+#if !defined(NDEBUG)
+    void dump() override;
+#endif
 private:
     llvm::SmallVector<VarDecl *, 10> Decls;
 };
@@ -107,6 +113,9 @@ public:
     static bool classof(Stmt *S) {
         return S->getStmtID() == Stmt::kCompoundStmt;
     }
+#if !defined(NDEBUG)
+    void dump() override;
+#endif
 private:
     llvm::SmallVector<Stmt *, 10> Stmts;
 };
@@ -119,6 +128,9 @@ public:
     IfStmt(ExprStmt *Cond, Stmt *Then, Stmt *Else = nullptr);
 public:
     llvm::Value *CodeGen(CompileUnitDecl *) override;
+#if !defined(NDEBUG)
+    void dump() override;
+#endif
 private:
     ExprStmt *Cond;
     Stmt *Then, *Else;
@@ -134,6 +146,9 @@ public:
     bool hasBody() const { return Body != nullptr; }
     void setBody(Stmt *B) { Body = B; }
     llvm::Value *CodeGen(CompileUnitDecl *) override;
+#if !defined(NDEBUG)
+    void dump() override;
+#endif
 private:
     ExprStmt *Cond;
     Stmt *Body;
@@ -202,6 +217,9 @@ public:
     static bool classof(Stmt *S) {
         return S->getStmtID() == Stmt::kCallStmt;
     }
+#if !defined(NDEBUG)
+    void dump() override;
+#endif
 private:
     // Callee function name.
     std::string Callee;
@@ -228,6 +246,9 @@ public:
     static bool classof(Stmt *S) {
         return S->getStmtID() == Stmt::kDeclRefStmt;
     }
+#if !defined(NDEBUG)
+    void dump() override;
+#endif
 private:
     std::string Symbol;
 };
@@ -247,6 +268,9 @@ public:
     static bool classof(Stmt *S) {
         return S->getStmtID() == Stmt::kArraySubscriptStmt;
     }
+#if !defined(NDEBUG)
+    void dump() override;
+#endif
 private:
     ExprStmt *Base, *Idx;
 };
@@ -265,7 +289,9 @@ public:
     static bool classof(Stmt *S) {
         return S->getStmtID() == Stmt::kReturnStmt;
     }
-
+#if !defined(NDEBUG)
+    void dump() override;
+#endif
 private:
     ExprStmt *RetExpr;
 };
@@ -299,6 +325,9 @@ public:
     static bool classof(const Stmt *S) {
         return S->getStmtID() == Stmt::kBinaryOperator;
     }
+#if !defined(NDEBUG)
+    void dump() override;
+#endif
 protected:
     llvm::Value *Operands[2];
     ExprStmt *SubExprs[2];
@@ -325,7 +354,10 @@ public:
     }
     static bool classof(const Stmt *S) {
         return S->getStmtID() == Stmt::kIntegerLiteral;
-    } 
+    }
+#if !defined(NDEBUG)
+    void dump() override;
+#endif
 protected:
     llvm::APInt Value;
 };
@@ -348,6 +380,9 @@ public:
     static bool classof(const Stmt *S) {
         return S->getStmtID() == Stmt::kFloatingLiteral;
     }
+#if !defined(NDEBUG)
+    void dump() override;
+#endif
 protected:
     // llvm::APFloat support convertXXX for casting.
     // llvm::IEEEFloat also works
@@ -366,6 +401,9 @@ public:
     }
     llvm::StringRef getVal() const { return Literal; }
     llvm::Value *CodeGen(CompileUnitDecl *) override;
+#if !defined(NDEBUG)
+    void dump() override;
+#endif
 private:
     std::string Literal;
 };

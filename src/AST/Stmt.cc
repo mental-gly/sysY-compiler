@@ -246,12 +246,15 @@ Value *ArraySubscriptStmt::CodeGen(CompileUnitDecl *U) {
         << "'" << reinterpret_cast<DeclRefStmt *>(BaseVal)->getSymbolName().str() << "'"
         << " should be an array or a pointer type";
     if (BaseVal->getType()->isArrayTy())
-        return builder->CreateGEP(BaseVal, IdxVal);
+        return builder->CreateGEP(BaseVal->getType()->getArrayElementType(),
+                                  BaseVal, IdxVal);
     if (BaseVal->getType()->isPointerTy()) {
         if (BaseVal->getType()->getPointerElementType()->isSingleValueType())
-            return builder->CreateGEP(BaseVal->getType(), BaseVal, IdxVal);
+            return builder->CreateGEP(BaseVal->getType(),
+                                      BaseVal, IdxVal);
         if (BaseVal->getType()->getPointerElementType()->isArrayTy())
-            return builder->CreateGEP(BaseVal,
+            return builder->CreateGEP(BaseVal->getType(),
+                                    BaseVal,
                                       {ConstantInt::get(Type::getInt64Ty(*context), 0),
                                       IdxVal});
     }

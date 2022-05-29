@@ -279,7 +279,7 @@ UnmatchedStmt
 ;
 
 WhileStmt
-: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList{
+: WHILE OPENPAREN ExprStmt CLOSEPAREN Block{
     auto expr_stmt = $3;
     auto comp_stmt = $5;
     $$ = new WhileStmt(static_cast<ExprStmt*>(expr_stmt), comp_stmt);

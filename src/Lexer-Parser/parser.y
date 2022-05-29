@@ -181,66 +181,66 @@ basicType
 CompoundStmtList
 : CompoundStmtList DeclStmt {
     auto decl_stmt = $2;
-    comp_stmt_tail -> Next = decl_stmt;
-    decl_stmt -> Prev = comp_stmt_tail;
-    comp_stmt_tail = comp_stmt_tail -> Next;
+    $1 -> tail -> Next = decl_stmt;
+    decl_stmt -> Prev = $1 -> tail;
+    $1 -> tail = $1 -> tail -> Next;
     $$ = $1;
 }
 | DeclStmt {
     auto comp_ptr = $1;
-    comp_stmt_tail = comp_ptr;
     $$ = comp_ptr;
+    $$ -> tail = comp_ptr;
     LOG(INFO) << "DeclStmt";
 }
 | CompoundStmtList ReturnStmt {
     auto ret_stmt = $2;
-    comp_stmt_tail -> Next = ret_stmt;
-    ret_stmt -> Prev = comp_stmt_tail;
-    comp_stmt_tail = comp_stmt_tail -> Next;
+    $1 -> tail -> Next = ret_stmt;
+    ret_stmt -> Prev = $1 -> tail;
+    $1 -> tail = $1 -> tail -> Next;
     $$ = $1; 
 }
 | ReturnStmt {
     auto comp_ptr = $1;
-    comp_stmt_tail = comp_ptr;
     $$ = comp_ptr;
+    $$ -> tail = comp_ptr;
 }
 | CompoundStmtList IfStmt {
     auto if_stmt = $2;
-    comp_stmt_tail -> Next = if_stmt;
-    if_stmt -> Prev = comp_stmt_tail;
-    comp_stmt_tail = comp_stmt_tail -> Next;
+    $1 -> tail -> Next = if_stmt;
+    if_stmt -> Prev = $1 -> tail;
+    $1 -> tail = $1 -> tail -> Next;
     $$ = $1; 
     LOG(INFO) << "Add IF to CompoundStmt, list header :" << $1;
 }
 | IfStmt {
     auto comp_ptr = $1;
-    comp_stmt_tail = comp_ptr;
     $$ = comp_ptr;
+    $$ -> tail = comp_ptr;
     LOG(INFO) << "Add IF to CompoundStmt tail";
 }
 | CompoundStmtList WhileStmt {
     auto while_stmt = $2;
-    comp_stmt_tail -> Next = while_stmt;
-    while_stmt -> Prev = comp_stmt_tail;
-    comp_stmt_tail = comp_stmt_tail -> Next;
+    $1 -> tail -> Next = while_stmt;
+    while_stmt -> Prev = $1 -> tail;
+    $1 -> tail = $1 -> tail -> Next;
     $$ = $1; 
 }
 | WhileStmt {
     auto comp_ptr = $1;
-    comp_stmt_tail = comp_ptr;
     $$ = comp_ptr;
+    $$ -> tail = comp_ptr;
 }
 | CompoundStmtList ExprStmt SEMICOLON{
     auto expr_stmt = $2;
-    comp_stmt_tail -> Next = expr_stmt;
-    expr_stmt -> Prev = comp_stmt_tail;
-    comp_stmt_tail = comp_stmt_tail -> Next;
+    $1 -> tail -> Next = expr_stmt;
+    expr_stmt -> Prev = $1 -> tail;
+    $1 -> tail = $1 -> tail -> Next;
     $$ = $1; 
 }
 | ExprStmt SEMICOLON{
     auto comp_ptr = $1;
-    comp_stmt_tail = comp_ptr;
     $$ = comp_ptr;
+    $$ -> tail = comp_ptr;
 }
 ;
 

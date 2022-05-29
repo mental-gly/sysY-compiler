@@ -1,0 +1,187 @@
+parser.y: warning: 8 shift/reduce conflicts [-Wconflicts-sr]
+parser.y: warning: shift/reduce conflict on token INTEGER [-Wcounterexamples]
+  Example: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList • INTEGER IdentifierList SEMICOLON
+  Shift derivation
+    CompoundStmtList
+    ↳ 22: WhileStmt
+          ↳ 30: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList
+                                                    ↳ 15: CompoundStmtList DeclStmt
+                                                                           ↳ 31: basicType       IdentifierList SEMICOLON
+                                                                                 ↳ 12: • INTEGER
+  Reduce derivation
+    CompoundStmtList
+    ↳ 15: CompoundStmtList                                                   DeclStmt
+          ↳ 22: WhileStmt                                                    ↳ 31: basicType     IdentifierList SEMICOLON
+                ↳ 30: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList •       ↳ 12: INTEGER
+parser.y: warning: shift/reduce conflict on token CHAR [-Wcounterexamples]
+  Example: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList • CHAR IdentifierList SEMICOLON
+  Shift derivation
+    CompoundStmtList
+    ↳ 22: WhileStmt
+          ↳ 30: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList
+                                                    ↳ 15: CompoundStmtList DeclStmt
+                                                                           ↳ 31: basicType    IdentifierList SEMICOLON
+                                                                                 ↳ 13: • CHAR
+  Reduce derivation
+    CompoundStmtList
+    ↳ 15: CompoundStmtList                                                   DeclStmt
+          ↳ 22: WhileStmt                                                    ↳ 31: basicType  IdentifierList SEMICOLON
+                ↳ 30: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList •       ↳ 13: CHAR
+parser.y: warning: shift/reduce conflict on token VOID [-Wcounterexamples]
+  Example: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList • VOID IdentifierList SEMICOLON
+  Shift derivation
+    CompoundStmtList
+    ↳ 22: WhileStmt
+          ↳ 30: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList
+                                                    ↳ 15: CompoundStmtList DeclStmt
+                                                                           ↳ 31: basicType    IdentifierList SEMICOLON
+                                                                                 ↳ 14: • VOID
+  Reduce derivation
+    CompoundStmtList
+    ↳ 15: CompoundStmtList                                                   DeclStmt
+          ↳ 22: WhileStmt                                                    ↳ 31: basicType  IdentifierList SEMICOLON
+                ↳ 30: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList •       ↳ 14: VOID
+parser.y: warning: shift/reduce conflict on token RETURN [-Wcounterexamples]
+  Example: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList • RETURN ExprStmt SEMICOLON
+  Shift derivation
+    CompoundStmtList
+    ↳ 22: WhileStmt
+          ↳ 30: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList
+                                                    ↳ 17: CompoundStmtList ReturnStmt
+                                                                           ↳ 25: • RETURN ExprStmt SEMICOLON
+  Reduce derivation
+    CompoundStmtList
+    ↳ 17: CompoundStmtList                                                   ReturnStmt
+          ↳ 22: WhileStmt                                                    ↳ 25: RETURN ExprStmt SEMICOLON
+                ↳ 30: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList •
+parser.y: warning: shift/reduce conflict on token IF [-Wcounterexamples]
+time limit exceeded: 6.000000
+  First example: basicType IDENTIFIER OPENPAREN ParamList CLOSEPAREN OPENBRACE WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList • IF OPENPAREN ExprStmt CLOSEPAREN Block ELSE Block IfStmt CLOSEBRACE $end
+  Shift derivation
+    $accept
+    ↳ 0: Program                                                                                                                                                                                                                                     $end
+         ↳ 1: CompileUnit
+              ↳ 3: FunctionDecl
+                   ↳ 4: basicType IDENTIFIER OPENPAREN ParamList CLOSEPAREN Block
+                                                                            ↳ 11: OPENBRACE CompoundStmtList                                                                                                                              CLOSEBRACE
+                                                                                            ↳ 19: WhileStmt                                                                                                                        IfStmt
+                                                                                                  ↳ 30: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList
+                                                                                                                                            ↳ 19: CompoundStmtList IfStmt
+                                                                                                                                                                   ↳ 26: MatchedStmt
+                                                                                                                                                                         ↳ 28: • IF OPENPAREN ExprStmt CLOSEPAREN Block ELSE Block
+  Second example: basicType IDENTIFIER OPENPAREN ParamList CLOSEPAREN OPENBRACE WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList • IF OPENPAREN ExprStmt CLOSEPAREN Block ELSE Block CLOSEBRACE $end
+  Reduce derivation
+    $accept
+    ↳ 0: Program                                                                                                                                                                                                                              $end
+         ↳ 1: CompileUnit
+              ↳ 3: FunctionDecl
+                   ↳ 4: basicType IDENTIFIER OPENPAREN ParamList CLOSEPAREN Block
+                                                                            ↳ 11: OPENBRACE CompoundStmtList                                                                                                                       CLOSEBRACE
+                                                                                            ↳ 19: CompoundStmtList                                                   IfStmt
+                                                                                                  ↳ 22: WhileStmt                                                    ↳ 26: MatchedStmt
+                                                                                                        ↳ 30: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList •       ↳ 28: IF OPENPAREN ExprStmt CLOSEPAREN Block ELSE Block
+parser.y: warning: shift/reduce conflict on token IF [-Wcounterexamples]
+Productions leading up to the conflict state found.  Still finding a possible unifying counterexample...time limit exceeded: 6.000000
+  First example: IfStmt
+  Shift derivation
+    CompoundStmtList
+    ↳ 19: IfStmt
+  Second example: ExprStmt CLOSEPAREN Block CLOSEPAREN Block
+  Reduce derivation
+    CompoundStmtList
+    ↳ 19: ExprStmt IfStmt
+                   ↳ 27: UnmatchedStmt
+                         ↳ 29: CLOSEPAREN Block CLOSEPAREN Block
+parser.y: warning: shift/reduce conflict on token WHILE [-Wcounterexamples]
+Productions leading up to the conflict state found.  Still finding a possible unifying counterexample...  Example: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList • WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList
+  Shift derivation
+    CompoundStmtList
+    ↳ 22: WhileStmt
+          ↳ 30: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList
+                                                    ↳ 21: CompoundStmtList WhileStmt
+                                                                           ↳ 30: • WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList
+  Reduce derivation
+    CompoundStmtList
+    ↳ 21: CompoundStmtList                                                   WhileStmt
+          ↳ 22: WhileStmt                                                    ↳ 30: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList
+                ↳ 30: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList •
+parser.y: warning: shift/reduce conflict on token INT_CONST [-Wcounterexamples]
+  Example: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList • INT_CONST OR ExprStmt SEMICOLON
+  Shift derivation
+    CompoundStmtList
+    ↳ 22: WhileStmt
+          ↳ 30: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList
+                                                    ↳ 23: CompoundStmtList ExprStmt                            SEMICOLON
+                                                                           ↳ 47: IntegerLiteral    OR ExprStmt
+                                                                                 ↳ 63: • INT_CONST
+  Reduce derivation
+    CompoundStmtList
+    ↳ 23: CompoundStmtList                                                   ExprStmt                          SEMICOLON
+          ↳ 22: WhileStmt                                                    ↳ 47: IntegerLiteral  OR ExprStmt
+                ↳ 30: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList •       ↳ 63: INT_CONST
+parser.y: warning: shift/reduce conflict on token IDENTIFIER [-Wcounterexamples]
+time limit exceeded: 6.000000
+  First example: basicType IDENTIFIER OPENPAREN ParamList CLOSEPAREN OPENBRACE WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList • IDENTIFIER OPENBRACKET ExprStmt CLOSEBRACKET ASSIGN ExprStmt SEMICOLON ExprStmt SEMICOLON CLOSEBRACE $end
+  Shift derivation
+    $accept
+    ↳ 0: Program                                                                                                                                                                                                                                                                      $end
+         ↳ 1: CompileUnit
+              ↳ 3: FunctionDecl
+                   ↳ 4: basicType IDENTIFIER OPENPAREN ParamList CLOSEPAREN Block
+                                                                            ↳ 11: OPENBRACE CompoundStmtList                                                                                                                                                               CLOSEBRACE
+                                                                                            ↳ 23: WhileStmt                                                                                                                                             ExprStmt SEMICOLON
+                                                                                                  ↳ 30: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList
+                                                                                                                                            ↳ 23: CompoundStmtList ExprStmt                                                                   SEMICOLON
+                                                                                                                                                                   ↳ 33: DeclRefStmt                                          ASSIGN ExprStmt
+                                                                                                                                                                         ↳ 64: • IDENTIFIER OPENBRACKET ExprStmt CLOSEBRACKET
+  Second example: basicType IDENTIFIER OPENPAREN ParamList CLOSEPAREN OPENBRACE WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList • IDENTIFIER OPENBRACKET ExprStmt CLOSEBRACKET ASSIGN ExprStmt SEMICOLON CLOSEBRACE $end
+  Reduce derivation
+    $accept
+    ↳ 0: Program                                                                                                                                                                                                                                                   $end
+         ↳ 1: CompileUnit
+              ↳ 3: FunctionDecl
+                   ↳ 4: basicType IDENTIFIER OPENPAREN ParamList CLOSEPAREN Block
+                                                                            ↳ 11: OPENBRACE CompoundStmtList                                                                                                                                            CLOSEBRACE
+                                                                                            ↳ 23: CompoundStmtList                                                   ExprStmt                                                                 SEMICOLON
+                                                                                                  ↳ 22: WhileStmt                                                    ↳ 33: DeclRefStmt                                        ASSIGN ExprStmt
+                                                                                                        ↳ 30: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList •       ↳ 64: IDENTIFIER OPENBRACKET ExprStmt CLOSEBRACKET
+parser.y: warning: shift/reduce conflict on token IDENTIFIER [-Wcounterexamples]
+  Example: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList • IDENTIFIER ASSIGN ExprStmt SEMICOLON
+  Shift derivation
+    CompoundStmtList
+    ↳ 22: WhileStmt
+          ↳ 30: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList
+                                                    ↳ 23: CompoundStmtList ExprStmt                                 SEMICOLON
+                                                                           ↳ 33: DeclRefStmt        ASSIGN ExprStmt
+                                                                                 ↳ 65: • IDENTIFIER
+  Reduce derivation
+    CompoundStmtList
+    ↳ 23: CompoundStmtList                                                   ExprStmt                               SEMICOLON
+          ↳ 22: WhileStmt                                                    ↳ 33: DeclRefStmt      ASSIGN ExprStmt
+                ↳ 30: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList •       ↳ 65: IDENTIFIER
+parser.y: warning: shift/reduce conflict on token IDENTIFIER [-Wcounterexamples]
+time limit exceeded: 6.000000
+  First example: basicType IDENTIFIER OPENPAREN ParamList CLOSEPAREN OPENBRACE WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList • IDENTIFIER OPENPAREN ExprStmtList CLOSEPAREN SEMICOLON ExprStmt SEMICOLON CLOSEBRACE $end
+  Shift derivation
+    $accept
+    ↳ 0: Program                                                                                                                                                                                                                                                      $end
+         ↳ 1: CompileUnit
+              ↳ 3: FunctionDecl
+                   ↳ 4: basicType IDENTIFIER OPENPAREN ParamList CLOSEPAREN Block
+                                                                            ↳ 11: OPENBRACE CompoundStmtList                                                                                                                                               CLOSEBRACE
+                                                                                            ↳ 23: WhileStmt                                                                                                                             ExprStmt SEMICOLON
+                                                                                                  ↳ 30: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList
+                                                                                                                                            ↳ 23: CompoundStmtList ExprStmt                                                   SEMICOLON
+                                                                                                                                                                   ↳ 62: CallStmt
+                                                                                                                                                                         ↳ 66: • IDENTIFIER OPENPAREN ExprStmtList CLOSEPAREN
+  Second example: basicType IDENTIFIER OPENPAREN ParamList CLOSEPAREN OPENBRACE WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList • IDENTIFIER OPENBRACKET ExprStmt CLOSEBRACKET ASSIGN ExprStmt SEMICOLON CLOSEBRACE $end
+  Reduce derivation
+    $accept
+    ↳ 0: Program                                                                                                                                                                                                                                                   $end
+         ↳ 1: CompileUnit
+              ↳ 3: FunctionDecl
+                   ↳ 4: basicType IDENTIFIER OPENPAREN ParamList CLOSEPAREN Block
+                                                                            ↳ 11: OPENBRACE CompoundStmtList                                                                                                                                            CLOSEBRACE
+                                                                                            ↳ 23: CompoundStmtList                                                   ExprStmt                                                                 SEMICOLON
+                                                                                                  ↳ 22: WhileStmt                                                    ↳ 33: DeclRefStmt                                        ASSIGN ExprStmt
+                                                                                                        ↳ 30: WHILE OPENPAREN ExprStmt CLOSEPAREN CompoundStmtList •       ↳ 64: IDENTIFIER OPENBRACKET ExprStmt CLOSEBRACKET

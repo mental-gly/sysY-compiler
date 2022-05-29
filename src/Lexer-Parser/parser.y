@@ -4,6 +4,7 @@
 #include "AST/Decl.h"
 #include "AST/Stmt.h"
 #include "AST/TypeInfo.h"
+#include "logging.h"
 }
 
 %{
@@ -128,7 +129,7 @@ ParamList
 : ParamDecl{
     auto param_ptr = $1;
     param_decl_tail = param_ptr;
-    $$ = param_ptr;  
+    $$ = param_ptr;
 }
 | ParamList COMMA ParamDecl{
     auto param_decl = $3;
@@ -147,6 +148,7 @@ ParamDecl
     auto type = $1;
     auto ident = $2;
     $$ = new ParamDecl(TypeContext::find(*type), *ident);
+    LOG(INFO) << "ParamDecl " << *($2) << " '" << *($1) << "'";
 }
 | basicType IDENTIFIER OPENBRACKET IntegerLiteral CLOSEBRACKET{
     auto type = $1;
@@ -160,6 +162,7 @@ Block
 : OPENBRACE CompoundStmtList CLOSEBRACE{
     auto comp_stmt = $2;
     $$ = new CompoundStmt(comp_stmt);
+    LOG(INFO) << "Block with CompoundStmt list header :" << $2;
 }
 ;
 
@@ -187,6 +190,7 @@ CompoundStmtList
     auto comp_ptr = $1;
     comp_stmt_tail = comp_ptr;
     $$ = comp_ptr;
+    LOG(INFO) << "DeclStmt";
 }
 | CompoundStmtList ReturnStmt {
     auto ret_stmt = $2;
@@ -206,11 +210,13 @@ CompoundStmtList
     if_stmt -> Prev = comp_stmt_tail;
     comp_stmt_tail = comp_stmt_tail -> Next;
     $$ = $1; 
+    LOG(INFO) << "Add IF to CompoundStmt, list header :" << $1;
 }
 | IfStmt {
     auto comp_ptr = $1;
     comp_stmt_tail = comp_ptr;
     $$ = comp_ptr;
+    LOG(INFO) << "Add IF to CompoundStmt tail";
 }
 | CompoundStmtList WhileStmt {
     auto while_stmt = $2;
@@ -260,6 +266,7 @@ MatchedStmt
     auto match_stmt = $5;
     auto smatch_stmt = $7;
     $$ = new IfStmt(static_cast<ExprStmt*>(expr_stmt), match_stmt, smatch_stmt);
+    LOG(INFO) << "Matched IF";
 }
 
 UnmatchedStmt
@@ -267,6 +274,7 @@ UnmatchedStmt
     auto expr_stmt = $3;
     auto match_stmt = $5;
     $$ = new IfStmt(static_cast<ExprStmt*>(expr_stmt), match_stmt);
+    LOG(INFO) << "Unmatched IF";
 }
 ;
 

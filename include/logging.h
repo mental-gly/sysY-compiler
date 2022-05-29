@@ -89,7 +89,7 @@ public:
         _M_stream << file << ":" << line << ": ";
     }
     ~Log() {
-        std::cout << _M_stream.str();
+        std::cout << _M_stream.str() << std::endl;
     }
     std::ostringstream &stream() { return _M_stream; }
 private:

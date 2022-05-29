@@ -186,6 +186,6 @@ void VarDecl::dump() {
 }
 
 void ParamDecl::dump() {
-    DUMP_WITH_IDENT(dump_indent, VarDecl);
+    DUMP_WITH_IDENT(dump_indent, ParamDecl);
     DUMP_NEWLINE(Name);
 }

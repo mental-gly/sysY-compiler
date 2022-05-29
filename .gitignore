@@ -1,3 +1,10 @@
+# Generated parsing file
+src/Lexer-Parser/lex.yy.cc
+src/Lexer-Parser/parser.tab.cc
+src/Lexer-Parser/parser.tab.hh
+src/Lexer-Parser/stack.hh
+src/Lexer-Parser/lexer_parser_test
+
 # IDE/Editor config files
 .vscode
 .idea

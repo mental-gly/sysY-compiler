@@ -6,6 +6,7 @@ template <typename T>
 struct ast_ilist_node {
     T *Prev;
     T *Next;
+    T *tail;
 };
 
 

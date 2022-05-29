@@ -5,7 +5,7 @@
 %{
 	#include <cstdlib>
 	#include <string>
-	#include "sysy.tab.hh"
+	#include "parser.tab.hh"
 
 	using namespace std;
 %}

@@ -242,18 +242,18 @@ Value *ArraySubscriptStmt::CodeGen(CompileUnitDecl *U) {
     auto context = U->getContext();
     auto BaseVal = Base->CodeGen(U);
     auto IdxVal = Base->CodeGen(U);
-    CHECK(BaseVal->getType()->isArrayTy() || BaseVal->getType()->isPointerTy())
+    // Banned non-pointer type.
+    CHECK(BaseVal->getType()->isPointerTy())
         << "'" << reinterpret_cast<DeclRefStmt *>(BaseVal)->getSymbolName().str() << "'"
         << " should be an array or a pointer type";
-    if (BaseVal->getType()->isArrayTy())
-        return builder->CreateGEP(BaseVal->getType()->getArrayElementType(),
-                                  BaseVal, IdxVal);
+    // Pointer to scalar or array.
+    // The Type of GEP is the \p pointee type.
     if (BaseVal->getType()->isPointerTy()) {
         if (BaseVal->getType()->getPointerElementType()->isSingleValueType())
-            return builder->CreateGEP(BaseVal->getType(),
+            return builder->CreateGEP(BaseVal->getType()->getPointerElementType(),
                                       BaseVal, IdxVal);
         if (BaseVal->getType()->getPointerElementType()->isArrayTy())
-            return builder->CreateGEP(BaseVal->getType(),
+            return builder->CreateGEP(BaseVal->getType()->getPointerElementType(),
                                     BaseVal,
                                       {ConstantInt::get(Type::getInt64Ty(*context), 0),
                                       IdxVal});

@@ -5,9 +5,14 @@
 %{
 	#include <cstdlib>
 	#include <string>
+	#include <map>
 	#include "parser.tab.hh"
 
 	using namespace std;
+	typedef std::map<std::string, std::string> TStrStrMap;
+	typedef std::pair<std::string, std::string> TStrStrPair;
+	TStrStrMap tMap;
+	string temp;
 %}
 
 WhiteSpace [ \t\n\r]*
@@ -20,6 +25,12 @@ commentLine_start   "//"
 commentLine_info  .
 commentLine_end  \n
 %x COMMENTLINE
+
+defineLine_start   "#define"
+defineLine_id  [a-zA-Z_][a-zA-Z0-9_]*
+defineLine_val [^ ]*
+defineLine_end  \n
+%x DEFINELINE
 
 EQ "=="
 NEQ "!="
@@ -121,7 +132,20 @@ FORMATCHAR [\r\n\t ]+
 {OCT} {yylval.int_val = strtol(yytext, nullptr, 0); return INT_CONST;}
 {DEC} {yylval.int_val = strtol(yytext, nullptr, 0); return INT_CONST;}
 {HEX} {yylval.int_val = strtol(yytext, nullptr, 0); return INT_CONST;}
-{IDENTIFIER} {yylval.str_val = new string(yytext); return IDENTIFIER;}
+{IDENTIFIER} {
+    std::string strValue = tMap[s];
+	if(strValue!="")
+	{
+		int z;
+        for(z=strlen(strValue)-1; z>=0; z--)
+            unput(strValue[z]);
+	}
+	else
+	{
+		yylval.str_val = new string(yytext); 
+		return IDENTIFIER;
+	}
+}
 
 {WhiteSpace} {}
 {commentBlock_start} {BEGIN COMMENTBLOCK;}
@@ -130,6 +154,13 @@ FORMATCHAR [\r\n\t ]+
 {commentLine_start} {BEGIN COMMENTLINE;}
 <COMMENTLINE>{commentLine_info} {}
 <COMMENTLINE>{commentLine_end} {BEGIN INITIAL;}
+
+{defineLine_start} {BEGIN DEFINELINE;}
+<DEFINELINE>{defineLine_id} {temp = new string(yytext);}
+<DEFINELINE>{defineLine_val} {
+	tMap.insert(TStrStrPair(temp, new string(yytext)));
+}
+<DEFINELINE>{defineLine_end} {BEGIN INITIAL;}
 
 . {return yytext[0];}
 

@@ -224,11 +224,12 @@ Value *DeclRefStmt::CodeGen(CompileUnitDecl *U) {
 
 //===-- ArraySubscriptStmt --===//
 
-ArraySubscriptStmt::ArraySubscriptStmt(ExprStmt *base, ExprStmt *idx)
+ArraySubscriptStmt::ArraySubscriptStmt(ExprStmt *base, ExprStmt *idx_list)
     : ExprStmt(ExprStmt::LValue)
 {
   Base = base;
-  Idx = idx;
+  for (auto idx = idx_list; idx != nullptr; idx = static_cast<ExprStmt *>(idx->Next))
+      Idx.push_back(idx);
 }
 
 TypeInfo *ArraySubscriptStmt::getType(CompileUnitDecl *U) {
@@ -241,23 +242,37 @@ Value *ArraySubscriptStmt::CodeGen(CompileUnitDecl *U) {
     auto builder = U->getBuilder();
     auto context = U->getContext();
     auto BaseVal = Base->CodeGen(U);
-    auto IdxVal = Base->CodeGen(U);
+    llvm::SmallVector<llvm::Value* , 10> IdxArray;
     // Banned non-pointer type.
     CHECK(BaseVal->getType()->isPointerTy())
         << "'" << reinterpret_cast<DeclRefStmt *>(BaseVal)->getSymbolName().str() << "'"
         << " should be an array or a pointer type";
+
+
+    auto BaseType = BaseVal->getType()->getPointerElementType();
+    if (BaseType->isArrayTy()) {
+        llvm::Value *PointerZeroIndex = ConstantInt::get(Type::getInt64Ty(*context), 0);
+        IdxArray.push_back(PointerZeroIndex);
+    }
+
+    for (const auto &idx : Idx) {
+        auto IdxVal = idx->CodeGen(U);
+        IdxArray.push_back(IdxVal);
+    }
+
     // Pointer to scalar or array.
     // The Type of GEP is the \p pointee type.
-    if (BaseVal->getType()->isPointerTy()) {
-        if (BaseVal->getType()->getPointerElementType()->isSingleValueType())
-            return builder->CreateGEP(BaseVal->getType()->getPointerElementType(),
-                                      BaseVal, IdxVal);
-        if (BaseVal->getType()->getPointerElementType()->isArrayTy())
-            return builder->CreateGEP(BaseVal->getType()->getPointerElementType(),
-                                    BaseVal,
-                                      {ConstantInt::get(Type::getInt64Ty(*context), 0),
-                                      IdxVal});
+    if (BaseType->isPointerTy()) {
+        auto LoadPointer = builder->CreateLoad(BaseVal->getType(), BaseVal);
+        return builder->CreateGEP(BaseVal->getType()->getPointerElementType(),
+                                  LoadPointer, IdxArray);
     }
+    if (BaseType->isArrayTy()) {
+        return builder->CreateGEP(BaseVal->getType()->getPointerElementType(),
+                                  BaseVal,
+                                  IdxArray);
+    }
+    // Temporarily not support Struct.
 }
 
 //===-- ReturnStmt --===//

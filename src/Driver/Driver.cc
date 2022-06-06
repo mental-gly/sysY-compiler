@@ -32,7 +32,7 @@ cl::opt<bool> EmitIR("S", cl::desc("emit LLVM IR"));
 CompileUnitDecl *ParseAST();
 Module *GenLLVMIR(CompileUnitDecl *Unit) {
     Unit->CodeGen();
-    return Unit->Module.get();
+    return Unit->getModule();
 }
 
 TargetMachine *GetTargetMachine(Module *module) {

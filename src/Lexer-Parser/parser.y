@@ -67,7 +67,7 @@ static Decl *iden_tail;
 %type <param_val> ParamList ParamDecl 
 %type <ident_val> IdentifierList 
 %type <comp_val> Program
-%type <stmt_val> CompoundStmtList ReturnStmt ExprStmt DeclRefStmt CallStmt ExprStmtList IfStmt MatchedStmt UnmatchedStmt WhileStmt Block
+%type <stmt_val> CompoundStmtList ReturnStmt ExprStmt DeclRefStmt CallStmt ExprStmtList IfStmt MatchedStmt UnmatchedStmt WhileStmt Block Subscript SubscriptList
 %type <li_val> IntegerLiteral
 %type <declstmt_val> DeclStmt
 %token T_CHAR T_INT T_STRING T_BOOL T_VOID
@@ -126,16 +126,14 @@ FunctionDecl
 ;
 
 ParamList
-: ParamDecl{
-    auto param_ptr = $1;
-    param_decl_tail = param_ptr;
-    $$ = param_ptr;
+: ParamDecl {
+    $1->Next = nullptr;
+    param_decl_tail = $1;
+    $$ = $1;
 }
 | ParamList COMMA ParamDecl{
-    auto param_decl = $3;
-    param_decl_tail -> Next = param_decl;
-    param_decl -> Prev = param_decl_tail;
-    param_decl_tail = param_decl_tail -> Next;
+    param_decl_tail = $3;
+    $1->Next = $3;
     $$ = $1;  
 }
 ;
@@ -148,6 +146,7 @@ ParamDecl
     auto type = $1;
     auto ident = $2;
     $$ = new ParamDecl(TypeContext::find(*type), *ident);
+    $$->Next = nullptr;
     LOG(INFO) << "ParamDecl " << *($2) << " '" << *($1) << "'";
 }
 | basicType IDENTIFIER OPENBRACKET IntegerLiteral CLOSEBRACKET{
@@ -181,66 +180,67 @@ basicType
 CompoundStmtList
 : CompoundStmtList DeclStmt {
     auto decl_stmt = $2;
-    $1 -> tail -> Next = decl_stmt;
-    decl_stmt -> Prev = $1 -> tail;
-    $1 -> tail = $1 -> tail -> Next;
+    $1 -> Tail -> Next = decl_stmt;
+    decl_stmt -> Prev = $1 -> Tail;
+    $1 -> Tail = $1 -> Tail -> Next;
     $$ = $1;
 }
 | DeclStmt {
     auto comp_ptr = $1;
     $$ = comp_ptr;
-    $$ -> tail = comp_ptr;
-    LOG(INFO) << "DeclStmt";
+    $$ -> Tail = comp_ptr;
+    LOG(INFO) << "DeclStmt as CompoundStmt list header : " << $$;
 }
 | CompoundStmtList ReturnStmt {
     auto ret_stmt = $2;
-    $1 -> tail -> Next = ret_stmt;
-    ret_stmt -> Prev = $1 -> tail;
-    $1 -> tail = $1 -> tail -> Next;
+    $1 -> Tail -> Next = ret_stmt;
+    ret_stmt -> Prev = $1 -> Tail;
+    $1 -> Tail = $1 -> Tail -> Next;
     $$ = $1; 
 }
 | ReturnStmt {
     auto comp_ptr = $1;
     $$ = comp_ptr;
-    $$ -> tail = comp_ptr;
+    $$ -> Tail = comp_ptr;
 }
 | CompoundStmtList IfStmt {
     auto if_stmt = $2;
-    $1 -> tail -> Next = if_stmt;
-    if_stmt -> Prev = $1 -> tail;
-    $1 -> tail = $1 -> tail -> Next;
-    $$ = $1; 
+    $1 -> Tail -> Next = if_stmt;
+    if_stmt -> Prev = $1 -> Tail;
+    $1 -> Tail = $1 -> Tail -> Next;
+    $$ = $1;
+    $1->dump();
     LOG(INFO) << "Add IF to CompoundStmt, list header :" << $1;
 }
 | IfStmt {
     auto comp_ptr = $1;
     $$ = comp_ptr;
-    $$ -> tail = comp_ptr;
+    $$ -> Tail = comp_ptr;
     LOG(INFO) << "Add IF to CompoundStmt tail";
 }
 | CompoundStmtList WhileStmt {
     auto while_stmt = $2;
-    $1 -> tail -> Next = while_stmt;
-    while_stmt -> Prev = $1 -> tail;
-    $1 -> tail = $1 -> tail -> Next;
+    $1 -> Tail -> Next = while_stmt;
+    while_stmt -> Prev = $1 -> Tail;
+    $1 -> Tail = $1 -> Tail -> Next;
     $$ = $1; 
 }
 | WhileStmt {
     auto comp_ptr = $1;
     $$ = comp_ptr;
-    $$ -> tail = comp_ptr;
+    $$ -> Tail = comp_ptr;
 }
 | CompoundStmtList ExprStmt SEMICOLON{
     auto expr_stmt = $2;
-    $1 -> tail -> Next = expr_stmt;
-    expr_stmt -> Prev = $1 -> tail;
-    $1 -> tail = $1 -> tail -> Next;
+    $1 -> Tail -> Next = expr_stmt;
+    expr_stmt -> Prev = $1 -> Tail;
+    $1 -> Tail = $1 -> Tail -> Next;
     $$ = $1; 
 }
 | ExprStmt SEMICOLON{
     auto comp_ptr = $1;
     $$ = comp_ptr;
-    $$ -> tail = comp_ptr;
+    $$ -> Tail = comp_ptr;
 }
 ;
 
@@ -458,16 +458,33 @@ IntegerLiteral
 ;
 
 DeclRefStmt
-: IDENTIFIER OPENBRACKET ExprStmt CLOSEBRACKET{
+: IDENTIFIER SubscriptList {
     auto ident = $1;
     auto base = new DeclRefStmt(*ident);
-    auto expr_stmt = $3;
-    $$ = new ArraySubscriptStmt(base, static_cast<ExprStmt*>(expr_stmt));
+    auto expr_stmt = $2;
+    $$ = new ArraySubscriptStmt(base, static_cast<ExprStmt* >(expr_stmt));
 }
-| IDENTIFIER{
+| IDENTIFIER {
     auto ident = $1;
     $$ = new DeclRefStmt(*ident);
 }
+
+SubscriptList
+: SubscriptList Subscript {
+    $1->Next = $2;
+    $1->Tail = $2;
+    $$ = $1;
+}
+| Subscript {
+    $$ = $1;
+    $$->Tail = nullptr;
+}
+
+Subscript
+: OPENBRACKET ExprStmt CLOSEBRACKET {
+    $$ = $2;
+}
+
 
 CallStmt
 : IDENTIFIER OPENPAREN ExprStmtList CLOSEPAREN{

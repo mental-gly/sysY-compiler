@@ -70,11 +70,8 @@ FunctionDecl::FunctionDecl(TypeInfo *return_type, const std::string &name, Param
     : Decl(name)
 {
     ReturnType = return_type;
-    auto param = params;
-    while (param != nullptr) {
+    for (auto param = params; param != nullptr; param = static_cast<ParamDecl *>(param->Next)) {
         Params.push_back(param);
-        // We guarantee it's a safe static_cast.
-        param = static_cast<ParamDecl *>(param->Next);
     }
     Body = nullptr;
 }

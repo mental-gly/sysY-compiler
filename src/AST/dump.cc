@@ -97,7 +97,8 @@ void ArraySubscriptStmt::dump() {
     DUMP_NEWLINE("");
     Base->dump();
     DUMP_NEWLINE("");
-    Idx->dump();
+    for (const auto &idx : Idx)
+        idx->dump();
     dump_indent--;
 }
 

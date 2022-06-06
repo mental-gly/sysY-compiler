@@ -1,6 +1,4 @@
 %option noyywrap
-%option noinput
-%option nounput
 
 %{
 	#include <cstdlib>
@@ -133,18 +131,8 @@ FORMATCHAR [\r\n\t ]+
 {DEC} {yylval.int_val = strtol(yytext, nullptr, 0); return INT_CONST;}
 {HEX} {yylval.int_val = strtol(yytext, nullptr, 0); return INT_CONST;}
 {IDENTIFIER} {
-    std::string strValue = tMap[s];
-	if(strValue!="")
-	{
-		int z;
-        for(z=strlen(strValue)-1; z>=0; z--)
-            unput(strValue[z]);
-	}
-	else
-	{
-		yylval.str_val = new string(yytext); 
+		yylval.str_val = new std::string(yytext);
 		return IDENTIFIER;
-	}
 }
 
 {WhiteSpace} {}
@@ -155,12 +143,7 @@ FORMATCHAR [\r\n\t ]+
 <COMMENTLINE>{commentLine_info} {}
 <COMMENTLINE>{commentLine_end} {BEGIN INITIAL;}
 
-{defineLine_start} {BEGIN DEFINELINE;}
-<DEFINELINE>{defineLine_id} {temp = new string(yytext);}
-<DEFINELINE>{defineLine_val} {
-	tMap.insert(TStrStrPair(temp, new string(yytext)));
-}
-<DEFINELINE>{defineLine_end} {BEGIN INITIAL;}
+
 
 . {return yytext[0];}
 

@@ -272,7 +272,8 @@ public:
     void dump() override;
 #endif
 private:
-    ExprStmt *Base, *Idx;
+    ExprStmt *Base;
+    llvm::SmallVector<ExprStmt *, 10> Idx;
 };
 
 

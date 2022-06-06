@@ -28,11 +28,8 @@ CompileUnitDecl::CompileUnitDecl(const std::string &FileName, Decl *decls)
 void CompileUnitDecl::CreateSubDecls(Decl *DeList) {
     // Set declaration list in this compile unit.
     if (DeList != nullptr) {
-        auto decl = DeList;
-        while (decl != nullptr) {
+        for (auto decl = DeList; decl != nullptr; decl = decl->Next)
             Decls.push_back(decl);
-            decl = decl->Next;
-        }
     }
 }
 

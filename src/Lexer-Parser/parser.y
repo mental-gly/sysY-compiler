@@ -64,10 +64,10 @@ static Decl *iden_tail;
 
 %type <str_val> basicType 
 %type <func_val> FunctionDecl CompileUnit
-%type <param_val> ParamList ParamDecl 
-%type <ident_val> IdentifierList 
+%type <param_val> ParamList ParamDecl
+%type <ident_val> IdentifierList  VarDecl
 %type <comp_val> Program
-%type <stmt_val> CompoundStmtList ReturnStmt ExprStmt DeclRefStmt CallStmt ExprStmtList IfStmt MatchedStmt UnmatchedStmt WhileStmt Block Subscript SubscriptList
+%type <stmt_val> Stmt CompoundStmtList ReturnStmt ExprStmt DeclRefStmt CallStmt ExprStmtList IfStmt MatchedStmt UnmatchedStmt WhileStmt Block Subscript SubscriptList
 %type <li_val> IntegerLiteral
 %type <declstmt_val> DeclStmt
 %token T_CHAR T_INT T_STRING T_BOOL T_VOID
@@ -94,17 +94,16 @@ Program
 ;
 
 CompileUnit
-: CompileUnit FunctionDecl{
-    auto func_decl = $2;
-    func_decl_tail -> Next = func_decl;
-    func_decl -> Prev = func_decl_tail;
-    func_decl_tail = func_decl_tail -> Next;
+: CompileUnit FunctionDecl {
+    func_decl_tail->Next = $2;
+    func_decl_tail = $2;
     $$ = $1;
 }
 | FunctionDecl{
     auto func_decl =  $1;
     func_decl_tail = func_decl;
     $$ = func_decl;
+    $$->Next = nullptr;
 }
 ;
 
@@ -114,9 +113,10 @@ FunctionDecl
     auto ident = $2;
     auto param_list = $4;
     auto block = $6;
+    LOG(INFO) << "Function "<< *ident;
     $$ = new FunctionDecl(TypeContext::find(*type), *ident, static_cast<ParamDecl*>(param_list));
     $$ -> setBody(block);
-} 
+}
 | basicType IDENTIFIER OPENPAREN ParamList CLOSEPAREN SEMICOLON{
     auto type = $1;
     auto ident = $2;
@@ -131,29 +131,32 @@ ParamList
     param_decl_tail = $1;
     $$ = $1;
 }
-| ParamList COMMA ParamDecl{
+| ParamList COMMA ParamDecl {
+    param_decl_tail->Next = $3;
     param_decl_tail = $3;
-    $1->Next = $3;
-    $$ = $1;  
+    $$ = $1;
 }
 ;
 
 ParamDecl
-: {
-    $$ = new ParamDecl();
-}
-| basicType IDENTIFIER{
+: basicType IDENTIFIER {
     auto type = $1;
     auto ident = $2;
     $$ = new ParamDecl(TypeContext::find(*type), *ident);
     $$->Next = nullptr;
     LOG(INFO) << "ParamDecl " << *($2) << " '" << *($1) << "'";
 }
-| basicType IDENTIFIER OPENBRACKET IntegerLiteral CLOSEBRACKET{
+| basicType IDENTIFIER OPENBRACKET CLOSEBRACKET{
     auto type = $1;
     auto ident = $2;
-    auto num = $4 -> getVal();
-    $$ = new ParamDecl(REGISTER_ARRAY(*type, num), *ident);
+    $$ = new ParamDecl(REGISTER_ARRAY(*type, -1), *ident);
+    LOG(INFO) << "ParamDecl " << *($2) << " '" << *($1) << "'";
+}
+| basicType IDENTIFIER OPENBRACKET IntegerLiteral CLOSEBRACKET {
+    auto type = $1;
+    auto ident = $2;
+    auto len = $4->getVal();
+    $$ = new ParamDecl(REGISTER_ARRAY(*type, len), *ident);
 }
 ; 
 
@@ -162,6 +165,9 @@ Block
     auto comp_stmt = $2;
     $$ = new CompoundStmt(comp_stmt);
     LOG(INFO) << "Block with CompoundStmt list header :" << $2;
+}
+| OPENBRACE CLOSEBRACE {
+    $$ = new CompoundStmt(nullptr);
 }
 ;
 
@@ -178,39 +184,28 @@ basicType
 ;
 
 CompoundStmtList
-: CompoundStmtList DeclStmt {
-    auto decl_stmt = $2;
-    $1 -> Tail -> Next = decl_stmt;
-    decl_stmt -> Prev = $1 -> Tail;
-    $1 -> Tail = $1 -> Tail -> Next;
+: CompoundStmtList Stmt {
+    $1 -> Tail -> Next = $2;
+    $1 -> Tail = $2;
     $$ = $1;
 }
-| DeclStmt {
+| Stmt {
+    $$ = $1;
+    $1->Tail = $1;
+    $1->Next = nullptr;
+}
+
+Stmt
+: DeclStmt {
     auto comp_ptr = $1;
     $$ = comp_ptr;
     $$ -> Tail = comp_ptr;
     LOG(INFO) << "DeclStmt as CompoundStmt list header : " << $$;
 }
-| CompoundStmtList ReturnStmt {
-    auto ret_stmt = $2;
-    $1 -> Tail -> Next = ret_stmt;
-    ret_stmt -> Prev = $1 -> Tail;
-    $1 -> Tail = $1 -> Tail -> Next;
-    $$ = $1; 
-}
 | ReturnStmt {
     auto comp_ptr = $1;
     $$ = comp_ptr;
     $$ -> Tail = comp_ptr;
-}
-| CompoundStmtList IfStmt {
-    auto if_stmt = $2;
-    $1 -> Tail -> Next = if_stmt;
-    if_stmt -> Prev = $1 -> Tail;
-    $1 -> Tail = $1 -> Tail -> Next;
-    $$ = $1;
-    $1->dump();
-    LOG(INFO) << "Add IF to CompoundStmt, list header :" << $1;
 }
 | IfStmt {
     auto comp_ptr = $1;
@@ -218,26 +213,12 @@ CompoundStmtList
     $$ -> Tail = comp_ptr;
     LOG(INFO) << "Add IF to CompoundStmt tail";
 }
-| CompoundStmtList WhileStmt {
-    auto while_stmt = $2;
-    $1 -> Tail -> Next = while_stmt;
-    while_stmt -> Prev = $1 -> Tail;
-    $1 -> Tail = $1 -> Tail -> Next;
-    $$ = $1; 
-}
 | WhileStmt {
     auto comp_ptr = $1;
     $$ = comp_ptr;
     $$ -> Tail = comp_ptr;
 }
-| CompoundStmtList ExprStmt SEMICOLON{
-    auto expr_stmt = $2;
-    $1 -> Tail -> Next = expr_stmt;
-    expr_stmt -> Prev = $1 -> Tail;
-    $1 -> Tail = $1 -> Tail -> Next;
-    $$ = $1; 
-}
-| ExprStmt SEMICOLON{
+| ExprStmt SEMICOLON {
     auto comp_ptr = $1;
     $$ = comp_ptr;
     $$ -> Tail = comp_ptr;
@@ -248,6 +229,11 @@ ReturnStmt
 : RETURN ExprStmt SEMICOLON {
     auto expr_stmt = $2;
     $$ = new ReturnStmt(static_cast<ExprStmt*>(expr_stmt));
+    $$->Next = nullptr;
+}
+| RETURN SEMICOLON {
+    $$ = new ReturnStmt(nullptr);
+    $$->Next = nullptr;
 }
 ;
 
@@ -510,21 +496,29 @@ ExprStmtList
 ;
 
 IdentifierList
-: IDENTIFIER{
-    auto ident = $1;
-    auto iden_ptr = new VarDecl(*ident);
-    iden_tail = iden_ptr;
-    $$ = iden_ptr;
+: VarDecl {
+    iden_tail = $1;
+    $$ = $1;
 }
-| IdentifierList COMMA IDENTIFIER{
-    auto i = $3;
-    auto ident = new VarDecl(*i);
-    iden_tail -> Next = ident;
-    ident -> Prev = iden_tail;
-    iden_tail = iden_tail -> Next;
+| IdentifierList COMMA VarDecl{
+    iden_tail->Next = $3;
+    iden_tail = $3;
     $$ = $1;
 }
 ;
+
+VarDecl
+: IDENTIFIER {
+    auto Var = new VarDecl(*$1);
+    Var->Next = nullptr;
+    $$ = Var;
+}
+| IDENTIFIER ASSIGN ExprStmt {
+    auto Var = new VarDecl(*$1);
+    Var->Next = nullptr;
+    Var->setInit(static_cast<ExprStmt *>($3));
+    $$ = Var;
+}
 
 %%
 

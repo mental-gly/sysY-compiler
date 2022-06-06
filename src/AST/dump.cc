@@ -78,7 +78,10 @@ void ReturnStmt::dump() {
     DUMP_WITH_IDENT(dump_indent, ReturnStmt);
     dump_indent++;
     DUMP_NEWLINE("");
-    RetExpr->dump();
+    if (RetExpr != nullptr)
+        RetExpr->dump();
+    else
+        DUMP_WITH_IDENT(dump_indent, Void);
     dump_indent--;
 }
 
@@ -89,6 +92,7 @@ void CallStmt::dump() {
     for (auto &args : Args) {
         args->dump();
     }
+    dump_indent--;
 }
 
 void ArraySubscriptStmt::dump() {
@@ -96,7 +100,6 @@ void ArraySubscriptStmt::dump() {
     dump_indent++;
     DUMP_NEWLINE("");
     Base->dump();
-    DUMP_NEWLINE("");
     for (const auto &idx : Idx)
         idx->dump();
     dump_indent--;
@@ -148,7 +151,14 @@ void ::StringLiteral::dump() {
 }
 
 void WhileStmt::dump() {
-
+    Cond->dump();
+    LOG(FATAL);
+    DUMP_WITH_IDENT(dump_indent, While);
+    dump_indent++;
+    DUMP_NEWLINE("");
+    Cond->dump();
+    Body->dump();
+    dump_indent--;
 }
 
 
@@ -183,7 +193,15 @@ void FunctionDecl::dump() {
 
 void VarDecl::dump() {
     DUMP_WITH_IDENT(dump_indent, VarDecl);
-    DUMP_NEWLINE(Name);
+    errs() << Name << "\n";
+    if (getInit() != nullptr) {
+        dump_indent++;
+        DUMP_WITH_IDENT(dump_indent, Init);
+        errs() << "\n";
+        getInit()->dump();
+        dump_indent--;
+    }
+
 }
 
 void ParamDecl::dump() {

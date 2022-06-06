@@ -43,6 +43,7 @@ struct TypeInfo {
     // struct type member variable types
     // If this type is defined with typedef (kAlias), parent is the original type.
     // IF this type is a pointer (kPointer), parent is the de-reference class.
+    TypeInfo *Element;
     TypeInfo **Use {nullptr};
     // corresponding LLVM IR type.
     llvm::Type *Type;
@@ -83,8 +84,8 @@ private:
 
 
 #define REGISTER_NUMERIC(X) TypeContext::createNumericType(#X, sizeof(X))
-#define REGISTER_POINTER(X) TypeContext::createPointerType(#X)
-#define REGISTER_ARRAY(X, LEN) TypeContext::createArrayType(#X, LEN)
+#define REGISTER_POINTER(X) TypeContext::createPointerType(X)
+#define REGISTER_ARRAY(X, LEN) TypeContext::createArrayType(X, LEN)
 
 
 

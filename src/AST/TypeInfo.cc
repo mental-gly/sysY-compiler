@@ -24,7 +24,7 @@ void TypeContext::Init(LLVMContext *Context){
     SetLLVMType(REGISTER_NUMERIC(long long),         Type::getInt64Ty(*context));
     SetLLVMType(REGISTER_NUMERIC(unsigned long long),Type::getInt64Ty(*context));
     // String Literal char *
-    SetLLVMType(REGISTER_POINTER(char),              Type::getInt8PtrTy(*context));
+    SetLLVMType(REGISTER_POINTER("char"),              Type::getInt8PtrTy(*context));
 }
 
 
@@ -73,7 +73,7 @@ TypeInfo *TypeContext::createPointerType(const std::string &name_key) {
     type_table.emplace_back(std::hash<std::string>()(PointerOs.str()),
                             sizeof(void*), TypeInfo::kPointer, 1);
     auto new_type = &type_table.back();
-    new_type->Use[0] = base_type;
+    new_type->Element = base_type;
     return new_type;
 }
 
@@ -89,7 +89,7 @@ TypeInfo *TypeContext::createArrayType(const std::string &name_key, size_t Lengt
     type_table.emplace_back(std::hash<std::string>()(ArrayOs.str()),
                             sizeof(base_type->ByteSize * Length), TypeInfo::kArrays);
     auto new_type = &type_table.back();
-    new_type->Use[0] = base_type;
+    new_type->Element = base_type;
 
     if (Length > 0)
         // A true array type.

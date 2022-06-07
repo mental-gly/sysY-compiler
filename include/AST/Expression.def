@@ -1,8 +1,11 @@
 #ifndef OPERATOR
-#define OPERATOR(X) X
+#define OPERATOR(X)
 #endif
 #ifndef BINARY_OPERATOR
 #define BINARY_OPERATOR(X) OPERATOR(X)
+#endif
+#ifndef UNARY_OPERATOR
+#define UNARY_OPERATOR(X) OPERATOR(X)
 #endif
 
 // Standard binary operations
@@ -31,3 +34,10 @@ BINARY_OPERATOR(GreaterEqual)
 BINARY_OPERATOR(LessEqual)
 BINARY_OPERATOR(Equal)
 BINARY_OPERATOR(NotEqual)
+
+// Standard Unary Operator
+UNARY_OPERATOR(Addr)
+UNARY_OPERATOR(Dereference)
+UNARY_OPERATOR(Not)
+UNARY_OPERATOR(Increment)
+UNARY_OPERATOR(Decrement)

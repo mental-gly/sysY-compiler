@@ -307,7 +307,6 @@ public:
         Unknown,
     #define BINARY_OPERATOR(X) X,
     #include "Expression.def"
-        NUM_BINARY_OPERATORS,
     };
 public:
     // constructors.
@@ -335,6 +334,49 @@ protected:
     enum BinaryOpcode Opcode {Unknown};
     bool isSigned {true};
 };
+
+
+class UnaryOperatorStmt : public ExprStmt {
+    uint8_t SubClassID { Stmt::kUnaryOperator };
+public:
+    /// \brief Unary Operator varieties
+    enum UnaryOpcode : uint8_t {
+        Unknown,
+    #define UNARY_OPERATOR(X) X,
+    #include "Expression.def"
+        NUM_UNARY_OPERATORS,
+    };
+    static ExprStmt::ExprValueKind getKind(uint8_t Opcode) {
+        if (Opcode == UnaryOperatorStmt::Dereference)
+            return LValue;
+        return RValue;
+    }
+public:
+public:
+    // constructors.
+    UnaryOperatorStmt() = delete;
+    // If given two operands, the type of result need to deduce later.
+    UnaryOperatorStmt(enum UnaryOpcode opcode, ExprStmt *LHS)
+            : ExprStmt(UnaryOperatorStmt::getKind(opcode)), Opcode(opcode)
+    {
+        SubExpr = LHS;
+    }
+public:
+    uint32_t getOpcode() const { return Opcode; }
+    llvm::Value *CodeGen(CompileUnitDecl *) override;
+    TypeInfo *getType(CompileUnitDecl *) override;
+    static bool classof(const Stmt *S) {
+        return S->getStmtID() == Stmt::kBinaryOperator;
+    }
+#if !defined(NDEBUG)
+    void dump() override;
+#endif
+protected:
+    llvm::Value *Operand;
+    ExprStmt *SubExpr;
+    enum UnaryOpcode Opcode {Unknown};
+};
+
 
 
 /// \brief Integer literals in AST.

@@ -422,6 +422,22 @@ Value *BinaryOperatorStmt::CodeGen(CompileUnitDecl *U) {
     return nullptr;
 }
 
+//===-- UnaryOperator --===//
+llvm::Value *UnaryOperatorStmt::CodeGen(CompileUnitDecl *U) {
+    auto builder = U->getBuilder();
+    Operand = SubExpr->CodeGen(U);
+    CHECK_NE(Opcode, Unknown);
+    switch (Opcode) {
+        case Addr : return Operand;
+    }
+}
+
+TypeInfo *UnaryOperatorStmt::getType(CompileUnitDecl *U) {
+    if (ExprType != nullptr)
+        return ExprType;
+    return nullptr;
+}
+
 
 //===-- IntegerLiteral --===//
 

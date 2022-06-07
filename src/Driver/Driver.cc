@@ -5,9 +5,13 @@
 #include "llvm/Pass.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/TargetRegistry.h"
+#include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/Object/ObjectFile.h"
+// Legacy Pass Manager
+#include "llvm/IR/LegacyPassManager.h"
+#include <unistd.h>
 #include "AST/Decl.h"
 #include <string>
 #include <system_error>
@@ -22,12 +26,14 @@ cl::opt<std::string> OutputFileName("o", cl::desc("output filename"), cl::value_
 cl::opt<OptLevel> OptimizationLevel(cl::desc("Optimization level:"),
                                     cl::values(
                                             clEnumVal(O0, "default level, no optimizations"),
-                                            clEnumVal(O1, "enable trivial optimizations"),
+                                            clEnumVal(O1, "enable less optimizations"),
                                             clEnumVal(O2, "enable default optimizations"),
-                                            clEnumVal(O3, "enable expensive optimizations")
+                                            clEnumVal(O3, "enable aggressive optimizations")
                                             ),
                                     cl::init(O0));
-cl::opt<bool> EmitIR("S", cl::desc("emit LLVM IR"));
+cl::opt<bool> EmitAssembly("S", cl::desc("emit LLVM IR"));
+cl::opt<bool> EmitLLVMFile("emit-llvm", cl::desc("emit LLVM IR '.ll' or '.bc' file"))
+cl::opt<bool> EmitObject("c", cl::desc("emit object file"));
 
 CompileUnitDecl *ParseAST();
 Module *GenLLVMIR(CompileUnitDecl *Unit) {
@@ -39,6 +45,11 @@ TargetMachine *GetTargetMachine(Module *module) {
     // TargetTriples.
     // link to functionality with current machine.
     auto TargetTriple = sys::getDefaultTargetTriple();
+    InitializeAllTargetInfos();
+    InitializeAllTargets();
+    InitializeAllTargetMCs();
+    InitializeAllAsmParsers();
+    InitializeAllAsmPrinters();
     std::string Error;
     auto Target = TargetRegistry::lookupTarget(TargetTriple, Error);
     // Error if we could not find requested targets.
@@ -60,7 +71,7 @@ TargetMachine *GetTargetMachine(Module *module) {
     return TargetMachine;
 }
 
-void EmitObjectFile(Module *module) {
+void EmitObjectFile(Module *module, TargetMachine *target) {
     // Configuring output filesystem.
     std::string ObjectFileName;
     if (OutputFileName.c_str()) {
@@ -76,6 +87,16 @@ void EmitObjectFile(Module *module) {
     }
 
     // Emit object code.
+    auto FileType = CGFT_ObjectFile;
+    legacy::PassManager pass;
+
+    if (target->addPassesToEmitFile(pass, dest, nullptr, FileType)) {
+        errs() << "TargetMachine can't emit object file";
+        exit(1);
+    }
+
+    pass.run(*module);
+    dest.flush();
 }
 
 void EmitLLVMIR(Module *module) {
@@ -127,17 +148,26 @@ void RunOptPasses(Module *module, TargetMachine *target) {
     MPM.run(*module, MAM);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv, char **envp) {
     cl::ParseCommandLineOptions(argc, argv);
 
     CompileUnitDecl *Unit = ParseAST();
     Module *module = GenLLVMIR(Unit);
     TargetMachine *target = GetTargetMachine(module);
     RunOptPasses(module, target);
-    if (EmitIR) {
+    if (EmitAssembly) {
         EmitLLVMIR(module);
-    } else {
-        EmitObjectFile(module);
+    }
+    else if (EmitObject) {
+        EmitObjectFile(module, target);
+    }
+    else {
+        // GNU gold linker command line.
+        char *ld_argv[] = {"ld", "-e", "main", "-o", "a.out"};
+        if (!OutputFileName.empty()) {
+            ld_argv[4] = const_cast<char *>(OutputFileName.c_str());
+        }
+        execve("/usr/bin/ld", ld_argv, envp);
     }
     return 0;
 }

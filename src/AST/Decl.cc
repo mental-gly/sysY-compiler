@@ -58,7 +58,7 @@ llvm::Value *VarDecl::CodeGen(CompileUnitDecl *U) {
     auto CurBB = builder->GetInsertBlock();
     // make local variable alloca.
     builder->SetInsertPoint(EntryTerminator);
-    builder->CreateAlloca(getType()->Type, 0, Name);
+    return builder->CreateAlloca(getType()->Type, 0, Name);
 }
 
 //===-- FunctionDecl --===//
@@ -186,8 +186,9 @@ llvm::Function *FunctionDecl::CodeGen(CompileUnitDecl *U) {
             U->Symbol.LeaveScope();
 
             llvm::verifyFunction(*F, &llvm::errs());
+            return F;
         }
-    } else {
-        LOG(FATAL) << "Conflicting type for " << "'" << Name << "'";
     }
+    LOG(FATAL) << "Conflicting type for " << "'" << Name << "'";
+    return nullptr;
 }

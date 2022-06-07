@@ -137,6 +137,21 @@ void ::BinaryOperatorStmt::dump() {
     Indent.pop_back();
 }
 
+
+void ::UnaryOperatorStmt::dump() {
+    DUMP_WITH_IDENT(dump_indent, Binary);
+    const char *OpName;
+    switch (Opcode) {
+        case Addr : OpName = "prefix '*'"; break;
+    }
+    DUMP_NEWLINE(OpName);
+    Indent.push_back(dump_indent);
+    dump_indent++;
+    SubExpr->dump();
+    dump_indent--;
+    Indent.pop_back();
+}
+
 void ::IntegerLiteral::dump() {
     DUMP_WITH_IDENT(dump_indent, Integer);
     DUMP_NEWLINE(Value.getSExtValue());

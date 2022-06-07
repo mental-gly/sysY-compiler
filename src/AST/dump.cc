@@ -78,10 +78,12 @@ void ReturnStmt::dump() {
     DUMP_WITH_IDENT(dump_indent, ReturnStmt);
     dump_indent++;
     DUMP_NEWLINE("");
-    if (RetExpr != nullptr)
+    if (RetExpr != nullptr) {
         RetExpr->dump();
-    else
+    }
+    else {
         DUMP_WITH_IDENT(dump_indent, Void);
+    }
     dump_indent--;
 }
 
@@ -152,7 +154,6 @@ void ::StringLiteral::dump() {
 
 void WhileStmt::dump() {
     Cond->dump();
-    LOG(FATAL);
     DUMP_WITH_IDENT(dump_indent, While);
     dump_indent++;
     DUMP_NEWLINE("");

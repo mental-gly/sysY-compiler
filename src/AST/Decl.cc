@@ -84,19 +84,35 @@ bool FunctionDecl::hasDefinition(CompileUnitDecl *U) const {
 /// \brief This helper function replace return instruction with stores;
 /// This is due to the problem a early return would implicitly create a new BB
 /// in LLVM IR.
-static void doRARWS(llvm::IRBuilder<> *builder, llvm::Function *F) {
+static void doRARWS(llvm::IRBuilder<> *builder, llvm::Function *F,
+                    bool isVoid, llvm::Value *RetValAddr, llvm::BasicBlock *RetBB)
+{
+    // Get the final ret value alloc inst
     auto RetName = llvm::Twine(F->getName(), "ret");
     llvm::SmallVector<char, 10> Name;
-    auto RetValAddr = F->getValueSymbolTable()->lookup(RetName.toStringRef(Name));
     auto RetT = F->getReturnType();
     llvm::SmallVector<llvm::Instruction *, 10> WorkList;
     // iterating over instructions in the Function.
     for (auto I = llvm::inst_begin(F), E = llvm::inst_end(F); I != E; ++I) {
-        if (llvm::isa<llvm::ReturnInst>(&*I)) {
-            auto RetVal = llvm::dyn_cast<llvm::ReturnInst>(&*I);
-            auto Store = builder->CreateStore(RetVal->getOperand(0), RetValAddr);
-            I->replaceAllUsesWith(Store);
+        // We only deals with ReturnInst
+        if (llvm::Instruction::isTerminator(I->getOpcode())) {
+            if (llvm::isa<llvm::ReturnInst>(&*I)) {
+                auto RetInst = llvm::dyn_cast<llvm::ReturnInst>(&*I);
+                auto BB = RetInst->getParent();
+                if (!isVoid) {
+                    builder->SetInsertPoint(RetInst);
+                    // Replace return with a store to ValueAddr.
+                    auto Store = builder->CreateStore(RetInst->getOperand(0), RetValAddr);
+                    RetInst->replaceAllUsesWith(Store);
+                }
+                WorkList.push_back(RetInst);
+                builder->SetInsertPoint(BB);
+                builder->CreateBr(RetBB);
+            }
         }
+    }
+    for (auto DeadInst : WorkList) {
+        DeadInst->eraseFromParent();
     }
 }
 
@@ -152,22 +168,23 @@ llvm::Function *FunctionDecl::CodeGen(CompileUnitDecl *U) {
             // Generate definition.
             Body->CodeGen(U);
             // do Replace All Return With Store.
-            // doRARWS(builder, F);
+            doRARWS(builder, F, F->getReturnType()->isVoidTy(), RetValAlloca, FinalRetBB);
             // deal with final ret,
             // if there is no ret, we add a final ret.
-            if (!llvm::isa<llvm::ReturnInst>(F->getBasicBlockList().back().back())) {
-                F->getBasicBlockList().push_back(FinalRetBB);
+            F->getBasicBlockList().push_back(FinalRetBB);
+            auto CurrentFinalBB = builder->GetInsertBlock();
+            if (!llvm::Instruction::isTerminator(CurrentFinalBB->back().getOpcode()))
                 builder->CreateBr(FinalRetBB);
-                builder->SetInsertPoint(FinalRetBB);
-                // need load the return val.
-                llvm::Value *RetVal = nullptr;
-                if (!F->getReturnType()->isVoidTy()) {
-                    RetVal = builder->CreateLoad(F->getReturnType(), RetValAlloca);
-                }
-                builder->CreateRet(RetVal);
+            builder->SetInsertPoint(FinalRetBB);
+            // need load the return val.
+            llvm::Value *RetVal = nullptr;
+            if (!F->getReturnType()->isVoidTy()) {
+                RetVal = builder->CreateLoad(F->getReturnType(), RetValAlloca);
             }
+            builder->CreateRet(RetVal);
             builder->ClearInsertionPoint();
             U->Symbol.LeaveScope();
+
             llvm::verifyFunction(*F, &llvm::errs());
         }
     } else {

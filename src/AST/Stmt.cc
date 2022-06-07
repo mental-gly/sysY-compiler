@@ -1,5 +1,6 @@
 #include "AST/Stmt.h"
 #include "llvm/IR/ValueSymbolTable.h"
+#include "llvm/IR/Instruction.h"
 using namespace llvm;
 
 //===-- DeclStmt --===//
@@ -23,15 +24,14 @@ Value *DeclStmt::CodeGen(CompileUnitDecl *U) {
 
 //===-- CompoundStmt --===//
 CompoundStmt::CompoundStmt(Stmt *StList) {
-    auto SubStmt = StList;
-    while (SubStmt != nullptr) {
+    for (auto SubStmt  = StList; SubStmt != nullptr; SubStmt = SubStmt->Next) {
         Stmts.push_back(SubStmt);
-        SubStmt = SubStmt->Next;
     }
 }
 
 void CompoundStmt::CreateSubStmt(Stmt *SubStmt) {
-    Stmts.push_back(SubStmt);
+    if (SubStmt != nullptr)
+        Stmts.push_back(SubStmt);
 }
 
 Value *CompoundStmt::CodeGen(CompileUnitDecl *U) {
@@ -43,14 +43,17 @@ Value *CompoundStmt::CodeGen(CompileUnitDecl *U) {
     auto builder = U->getBuilder();
     for (auto SubStmt : Stmts) {
         RetInstTrack = SubStmt->CodeGen(U);
-        if (RetInstTrack != nullptr && isa<ReturnInst>(RetInstTrack)) break;
-        // optimization : ignore statements after ret.
-        if (!ReturnStmt::classof(SubStmt)) {
-            // auto F = builder->GetInsertBlock()->getParent();
-            // auto BB = BasicBlock::Create(*context,"", F);
-            // builder->CreateBr(BB);
-            // builder->SetInsertPoint(BB);
-            break;
+        if (isa<Instruction>(RetInstTrack)) {
+            auto Inst = dyn_cast<Instruction>(RetInstTrack);
+            // If the instruction is a terminator,
+            // We need create a new block;
+            // For ReturnInst, we deal with it especially in Function.
+            if (Instruction::isTerminator(Inst->getOpcode()) && SubStmt->Next != nullptr) {
+                auto F = builder->GetInsertBlock()->getParent();
+                auto BB = BasicBlock::Create(*context);
+                F->getBasicBlockList().push_back(BB);
+                builder->SetInsertPoint(BB);
+            }
         }
     }
     U->Symbol.LeaveScope();
@@ -116,7 +119,8 @@ Value *IfStmt::CodeGen(CompileUnitDecl *U) {
         ThenBB = builder->GetInsertBlock();
         /// \fixme : a better approach is dyn_cast<Instruction>()->isTerminator()
         /// to repair all early branch problem.
-        if (!isa<ReturnInst>(ThenBB->back())) builder->CreateBr(MergeBB);
+        if (!Instruction::isTerminator(ThenBB->back().getOpcode()))
+            builder->CreateBr(MergeBB);
         // Update Then block;
         // if then block generate multiple BB,
         // we should locate the ThenBB to the last basic block.
@@ -125,11 +129,12 @@ Value *IfStmt::CodeGen(CompileUnitDecl *U) {
         builder->SetInsertPoint(ElseBB);
         if (Else != nullptr) Else->CodeGen(U);
         ElseBB = builder->GetInsertBlock();
-        if (!isa<ReturnInst>(ElseBB->back())) builder->CreateBr(MergeBB);
+        if (!Instruction::isTerminator(ElseBB->back().getOpcode()))
+            builder->CreateBr(MergeBB);
         F->getBasicBlockList().push_back(MergeBB);
         builder->SetInsertPoint(MergeBB);
     }
-    return nullptr;
+    return LogicCondV;
 }
 
 //===-- WhileStmt --===//
@@ -165,7 +170,7 @@ llvm::Value *WhileStmt::CodeGen(CompileUnitDecl *U) {
         F->getBasicBlockList().push_back(MergeBB);
         builder->SetInsertPoint(MergeBB);
     }
-    return nullptr;
+    return LogicCondV;
 }
 
 //===-- CallStmt --===//
@@ -286,7 +291,14 @@ Value *ReturnStmt::CodeGen(CompileUnitDecl *U) {
     // any internal return br to this final BB.
     auto builder = U->getBuilder();
     llvm::Value *RetV = RetExpr->CodeGen(U);
-    return builder->CreateRet(RetV);
+    if (RetExpr->getValueKind() == ExprStmt::LValue) {
+        // RetV is a alloca.
+        auto LoadRetVar = builder->CreateLoad(RetV->getType()->getPointerElementType(), RetV);
+        return builder->CreateRet(LoadRetVar);
+    }
+    else {
+        return builder->CreateRet(RetV);
+    }
 }
 
 
@@ -334,11 +346,11 @@ static Value *doLess(IRBuilder<> *builder, Value *LHS, Value *RHS, bool isSigned
     if (LHS->getType()->isIntegerTy()) {
         auto LType = dyn_cast<IntegerType>(LHS->getType());
         auto RType = dyn_cast<IntegerType>(RHS->getType());
-        if (isSigned) return builder->CreateICmpSGT(LHS, RHS);
+        if (isSigned) return builder->CreateICmpSLT(LHS, RHS);
         else return builder->CreateICmpULT(LHS, RHS);
     }
     if (LHS->getType()->isDoubleTy() || LHS->getType()->isFloatTy()) {
-        return builder->CreateFCmpOLE(LHS, RHS);
+        return builder->CreateFCmpOLT(LHS, RHS);
     }
     return nullptr;
 }

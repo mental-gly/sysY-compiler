@@ -8,6 +8,7 @@
 #include "AST/Stmt.h"
 #include "AST/TypeInfo.h"
 #include "logging.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace std;
 
@@ -32,6 +33,8 @@ int main(int argc, const char *argv[]) {
     auto ret = yyparse(*Unit);
     assert(!ret);
     Unit->dump();
+    Unit->CodeGen();
+    Unit->getModule()->print(llvm::errs(), nullptr);
     cerr << "\n";
     // 输出解析得到的 AST, 其实就是个字符串
     cout << "success!" << endl;

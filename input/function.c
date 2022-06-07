@@ -1,5 +1,6 @@
 
 void quick_sort(int a[], int l, int r) {
+    ;
     if (l > r) { return;}
     int mid = l + r;
     mid = mid / 2;
@@ -15,6 +16,7 @@ void quick_sort(int a[], int l, int r) {
             a[j] = t;
         }
     }
+    ;
     quick_sort(a, l, mid);
     quick_sort(a, mid + 1, r);
     return;

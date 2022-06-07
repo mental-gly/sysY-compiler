@@ -185,14 +185,27 @@ basicType
 
 CompoundStmtList
 : CompoundStmtList Stmt {
-    $1 -> Tail -> Next = $2;
-    $1 -> Tail = $2;
-    $$ = $1;
+    if ($1 != nullptr) {
+        if ($2 != nullptr) {
+            $1 -> Tail -> Next = $2;
+            $1 -> Tail = $2;
+            $$ = $1;
+        }
+    }
+    else {
+        $$ = $2;
+        $2->Tail = $2;
+        $2->Next = nullptr;
+    }
 }
 | Stmt {
-    $$ = $1;
-    $1->Tail = $1;
-    $1->Next = nullptr;
+    if ($1 != nullptr) {
+        $$ = $1;
+        $1->Tail = $1;
+        $1->Next = nullptr;
+    } else {
+        $$ = nullptr;
+    }
 }
 
 Stmt
@@ -222,6 +235,9 @@ Stmt
     auto comp_ptr = $1;
     $$ = comp_ptr;
     $$ -> Tail = comp_ptr;
+}
+| SEMICOLON {
+    $$ = nullptr;
 }
 ;
 

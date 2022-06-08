@@ -74,6 +74,7 @@ TypeInfo *TypeContext::createPointerType(const std::string &name_key) {
                             sizeof(void*), TypeInfo::kPointer, 1);
     auto new_type = &type_table.back();
     new_type->Element = base_type;
+    SetLLVMType(new_type, PointerType::get(base_type->Type, 0));
     return new_type;
 }
 

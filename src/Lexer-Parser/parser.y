@@ -149,7 +149,7 @@ ParamDecl
 | basicType IDENTIFIER OPENBRACKET CLOSEBRACKET{
     auto type = $1;
     auto ident = $2;
-    $$ = new ParamDecl(REGISTER_ARRAY(*type, -1), *ident);
+    $$ = new ParamDecl(REGISTER_POINTER(*type), *ident);
     LOG(INFO) << "ParamDecl " << *($2) << " '" << *($1) << "'";
 }
 | basicType IDENTIFIER OPENBRACKET IntegerLiteral CLOSEBRACKET {

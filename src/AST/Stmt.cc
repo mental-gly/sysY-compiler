@@ -256,7 +256,6 @@ Value *ArraySubscriptStmt::CodeGen(CompileUnitDecl *U) {
         << "'" << reinterpret_cast<DeclRefStmt *>(BaseVal)->getSymbolName().str() << "'"
         << " should be an array or a pointer type";
 
-
     auto BaseType = BaseVal->getType()->getPointerElementType();
     if (BaseType->isArrayTy()) {
         llvm::Value *PointerZeroIndex = ConstantInt::get(Type::getInt64Ty(*context), 0);
@@ -265,20 +264,24 @@ Value *ArraySubscriptStmt::CodeGen(CompileUnitDecl *U) {
 
     for (const auto &idx : Idx) {
         auto IdxVal = idx->CodeGen(U);
+        if (idx->getValueKind() == LValue)
+            IdxVal = builder->CreateLoad(IdxVal->getType()->getPointerElementType(), IdxVal);
         IdxArray.push_back(IdxVal);
     }
 
     // Pointer to scalar or array.
     // The Type of GEP is the \p pointee type.
     if (BaseType->isPointerTy()) {
-        auto LoadPointer = builder->CreateLoad(BaseVal->getType(), BaseVal);
-        return builder->CreateGEP(BaseVal->getType()->getPointerElementType(),
+        auto LoadPointer = builder->CreateLoad(BaseVal->getType()->getPointerElementType(), BaseVal);
+        auto GEP =  builder->CreateGEP(LoadPointer->getType()->getPointerElementType(),
                                   LoadPointer, IdxArray);
+        return GEP;
     }
     if (BaseType->isArrayTy()) {
-        return builder->CreateGEP(BaseVal->getType()->getPointerElementType(),
+        auto GEP = builder->CreateGEP(BaseVal->getType()->getPointerElementType(),
                                   BaseVal,
                                   IdxArray);
+        return GEP;
     }
     // Temporarily not support Struct.
 }
@@ -401,6 +404,7 @@ Value *BinaryOperatorStmt::CodeGen(CompileUnitDecl *U) {
         Operands[0] = builder->CreateLoad(Operands[0]->getType()->getPointerElementType(), Operands[0]);
     if (SubExprs[1]->getValueKind() == ExprStmt::LValue)
         Operands[1] = builder->CreateLoad(Operands[1]->getType()->getPointerElementType(),Operands[1]);
+
     if (Operands[0] == nullptr || Operands[1] == nullptr)
         return nullptr;
     // considering implicit casting

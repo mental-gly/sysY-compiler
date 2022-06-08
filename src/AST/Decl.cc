@@ -7,7 +7,19 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 
+extern bool ImportStdio;
 //===-- CompileUnit --===//
+
+static void RegisterBuiltinStdio(CompileUnitDecl *U) {
+    auto context = U->getContext();
+    auto module = U->getModule();
+    auto IntRetT = llvm::Type::getInt32Ty(*context);
+    auto CharArgT = llvm::PointerType::get(llvm::Type::getInt8Ty(*context), 0);
+    auto FunT = llvm::FunctionType::get(IntRetT, CharArgT, true);
+    llvm::Function::Create(FunT, llvm::Function::ExternalLinkage, "scanf", module);
+    llvm::Function::Create(FunT, llvm::Function::ExternalLinkage, "printf", module);
+}
+
 CompileUnitDecl::CompileUnitDecl(const std::string &FileName, Decl *decls)
     :Decl(FileName)
 {
@@ -23,6 +35,7 @@ CompileUnitDecl::CompileUnitDecl(const std::string &FileName, Decl *decls)
             decl = decl->Next;
         }
     }
+
 }
 
 void CompileUnitDecl::CreateSubDecls(Decl *DeList) {
@@ -34,12 +47,8 @@ void CompileUnitDecl::CreateSubDecls(Decl *DeList) {
 }
 
 void CompileUnitDecl::CodeGen() {
-    auto Void = llvm::Type::getVoidTy(*getContext());
-    auto IntT = llvm::Type::getInt32Ty(*getContext());
-    auto builder = getBuilder();
-    auto FunT = llvm::FunctionType::get(Void, {IntT, IntT}, false);
-    llvm::Function::Create(FunT, llvm::Function::ExternalLinkage, "putInt", getModule());
-
+    // deals with built in function.
+    if (ImportStdio) RegisterBuiltinStdio(this);
     if (Decls.empty()) {
         LOG(WARNING) << Name << " has nothing to compile\n";
     }

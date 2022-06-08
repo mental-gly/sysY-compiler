@@ -528,13 +528,30 @@ Value *FloatingLiteral::CodeGen(CompileUnitDecl *U) {
 
 //===-- StringLiteral --===//
 
-::StringLiteral::StringLiteral(const std::string Literal)
-    : Literal(Literal) { }
+static void replace_all(std::string &in, std::string_view what, std::string_view with) {
+    for (size_t pos = 0; (pos = in.find(what.data(), pos, what.length())) != in.npos; pos += with.length()) {
+        in.replace(pos, what.length(), with.data(), with.length());
+    }
+}
+
+
+::StringLiteral::StringLiteral(const std::string &str)
+    : Literal(str)
+{
+    // deals with \ char
+    replace_all(Literal, "\\n", "\n");
+    replace_all(Literal , "\\t", "\\t");
+    replace_all(Literal, "\\\"", "\"");
+    replace_all(Literal, "\\\'", "\'");
+    replace_all(Literal, "\\\\", "\\");
+}
 
 Value *::StringLiteral::CodeGen(CompileUnitDecl *U) {
     auto context = U->getContext();
     auto module = U->getModule();
     auto builder = U->getBuilder();
-    auto ConstStringArray = builder->CreateGlobalString(Literal.c_str(), llvm::StringRef(Literal), 0, module);
-    return ConstStringArray;
+    auto ConstStringArray = builder->CreateGlobalString(Literal.c_str(), ".str", 0, module);
+    auto Idx = ConstantInt::get(Type::getInt64Ty(*context), 0);
+    auto GEP = builder->CreateGEP(ConstStringArray->getType()->getPointerElementType(), ConstStringArray, {Idx, Idx});
+    return GEP;
 }

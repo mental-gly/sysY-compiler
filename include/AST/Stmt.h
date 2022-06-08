@@ -480,7 +480,7 @@ class StringLiteral : public ExprStmt {
     uint8_t SubClassID { Stmt::kStringLiteral };
 public:
     StringLiteral() = delete;
-    StringLiteral(const std::string);
+    StringLiteral(const std::string &);
 public:
     TypeInfo *getType(CompileUnitDecl *U) override {
         return TypeContext::find("char*");

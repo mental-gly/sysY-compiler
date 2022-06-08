@@ -3,9 +3,11 @@
 %{
 	#include <cstdlib>
 	#include <string>
+	#include <iostream>
 	#include <map>
 	#include "parser.tab.hh"
 
+    extern bool ImportStdio = false;
 	using namespace std;
 	typedef std::map<std::string, std::string> TStrStrMap;
 	typedef std::pair<std::string, std::string> TStrStrPair;
@@ -73,6 +75,12 @@ INTEGER "int"
 BOOLEAN  "bool"
 CHAR "char"
 STRING "string"
+STDIO "use std.io;"
+escape \\n|\\t|\\r|\\\'|\\\"
+s_char [^\\\"\n]|{escape}
+c_char [^\\\'\n]|{escape}
+StringLiteral \"{s_char}+\"
+CharConst '\{c_char}+\'
 
 OCT 0[0-7]+
 DEC -?[0-9]+
@@ -122,6 +130,14 @@ FORMATCHAR [\r\n\t ]+
 {BREAK} {return BREAK;}
 {CONTINUE} {return CONTINUE;}
 {RETURN} {return RETURN;}
+{STDIO} {
+    ImportStdio = true;
+}
+{StringLiteral} {
+    // Remove " "
+    yylval.str_val = new std::string(yytext + 1, yyleng - 2);
+    return CONSTSTRING;
+}
 
 {INTEGER} {return INTEGER;}
 {BOOLEAN} {return BOOLEAN;}

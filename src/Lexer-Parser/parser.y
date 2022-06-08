@@ -32,6 +32,7 @@ class DeclRefStmt;
 class BinaryOperatorStmt;
 class IntegerLiteral;
 class FloatingLiteral;
+class StringLiteral;
 
 using namespace std;
 
@@ -59,6 +60,7 @@ static Decl *iden_tail;
   VarDecl* ident_val;
   CompileUnitDecl* comp_val;
   IntegerLiteral* li_val;
+  StringLiteral* st_val;
   DeclStmt* declstmt_val;
 }
 
@@ -69,6 +71,7 @@ static Decl *iden_tail;
 %type <comp_val> Program
 %type <stmt_val> Stmt CompoundStmtList ReturnStmt ExprStmt Expr DeclRefStmt CallStmt ExprStmtList IfStmt MatchedStmt UnmatchedStmt WhileStmt Block Subscript SubscriptList
 %type <li_val> IntegerLiteral
+%type <st_val> StringLiteral
 %type <declstmt_val> DeclStmt
 %token T_CHAR T_INT T_STRING T_BOOL T_VOID
 %token COMMA SEMICOLON OPENPAREN CLOSEPAREN OPENBRACE CLOSEBRACE OPENBRACKET CLOSEBRACKET
@@ -79,7 +82,7 @@ static Decl *iden_tail;
 %token EQ GRAEQ LESEQ NEQ GRA LES
 %token CHAR INTEGER STRING BOOLEAN
 %token <int_val> INT_CONST
-%token <str_val> IDENTIFIER 
+%token <str_val> IDENTIFIER CONSTSTRING
 
 %left EQ
 %left OR XOR AND
@@ -353,6 +356,9 @@ Expr
 | IntegerLiteral {
     $$ = $1;
 }
+| StringLiteral {
+    $$ = $1;
+}
 | CallStmt {
     $$ = $1;
 }
@@ -365,6 +371,11 @@ IntegerLiteral
     $$ = new IntegerLiteral(IntType, num);
 }
 ;
+
+StringLiteral
+: CONSTSTRING {
+    $$ = new StringLiteral(*$1);
+};
 
 DeclRefStmt
 : IDENTIFIER SubscriptList {

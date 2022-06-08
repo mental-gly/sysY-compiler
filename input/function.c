@@ -1,3 +1,4 @@
+use std.io;
 
 void quick_sort(int a[], int l, int r) {
     if (l > r) { return;}
@@ -9,7 +10,7 @@ void quick_sort(int a[], int l, int r) {
     while (i <= j) {
         while (a[i] < x) { i = i + 1; }
         while (a[j] > x) { j = j - 1; }
-        putInt(i, j);
+        printf("%d %d\n", i, j);
         if (i <= j) {
             int t = a[i];
             a[i]= a[j];

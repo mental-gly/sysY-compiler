@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
 project(compiler)
 set(CMAKE_VERBOSE_MAKEFILE ON)
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 # compile platform info
 message(STATUS "CMake_HOST_SYSTEM_NAME ${CMAKE_HOST_SYSTEM_NAME}")

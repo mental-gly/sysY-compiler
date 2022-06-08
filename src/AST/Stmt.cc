@@ -144,17 +144,21 @@ WhileStmt::WhileStmt(ExprStmt *Cond, Stmt *Body)
 llvm::Value *WhileStmt::CodeGen(CompileUnitDecl *U) {
     auto builder = U->getBuilder();
     auto context = U->getContext();
+    // Get parent function.
+    auto F = builder->GetInsertBlock()->getParent();
+    // Condition Block
+    auto CondBB = BasicBlock::Create(*context, "wcond", F);
+    if (!Instruction::isTerminator(CondBB->back().getOpcode()))
+        builder->CreateBr(CondBB);
+    builder->SetInsertPoint(CondBB);
     Value *CondV = Cond->CodeGen(U);
     CHECK(CondV->getType()->isSingleValueType())
         << "Expect a scalar type in `while` condition";
     Value *LogicCondV = doCompare(builder, CondV);
+
     // If while has body, gen the body.
     if (hasBody()) {
-        // Get parent function.
-        auto F = builder->GetInsertBlock()->getParent();
-        auto CondBB = BasicBlock::Create(*context, "cond", F);
-        builder->CreateBr(CondBB);
-        auto BodyBB = BasicBlock::Create(*context, "wbody");
+        auto BodyBB = BasicBlock::Create(*context, "wbody", F);
         auto MergeBB = BasicBlock::Create(*context, "wmerge");
         // Conditional branch.
         builder->CreateCondBr(LogicCondV, BodyBB, MergeBB);
@@ -166,7 +170,6 @@ llvm::Value *WhileStmt::CodeGen(CompileUnitDecl *U) {
         // Update Then block;
         // if then block generate multiple BB,
         // we should locate the ThenBB to the last basic block.
-        F->getBasicBlockList().push_back(BodyBB);
         F->getBasicBlockList().push_back(MergeBB);
         builder->SetInsertPoint(MergeBB);
     }

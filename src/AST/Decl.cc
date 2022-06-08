@@ -34,6 +34,12 @@ void CompileUnitDecl::CreateSubDecls(Decl *DeList) {
 }
 
 void CompileUnitDecl::CodeGen() {
+    auto Void = llvm::Type::getVoidTy(*getContext());
+    auto IntT = llvm::Type::getInt32Ty(*getContext());
+    auto builder = getBuilder();
+    auto FunT = llvm::FunctionType::get(Void, {IntT, IntT}, false);
+    llvm::Function::Create(FunT, llvm::Function::ExternalLinkage, "putInt", getModule());
+
     if (Decls.empty()) {
         LOG(WARNING) << Name << " has nothing to compile\n";
     }
@@ -64,10 +70,10 @@ llvm::Value *VarDecl::CodeGen(CompileUnitDecl *U) {
         builder->SetInsertPoint(EntryBB);
     }
     auto LocalVarAlloca =  builder->CreateAlloca(getType()->Type, 0, Name);
-    if (init_expr != nullptr) {
-        auto InitExpr = init_expr->CodeGen(U);
-        builder->CreateStore(InitExpr, LocalVarAlloca);
-    }
+
+    // Restore insert point.
+    builder->SetInsertPoint(CurBB);
+    return LocalVarAlloca;
 }
 
 //===-- FunctionDecl --===//
@@ -182,7 +188,7 @@ llvm::Function *FunctionDecl::CodeGen(CompileUnitDecl *U) {
             // if there is no ret, we add a final ret.
             F->getBasicBlockList().push_back(FinalRetBB);
             auto CurrentFinalBB = builder->GetInsertBlock();
-            if (!llvm::Instruction::isTerminator(CurrentFinalBB->back().getOpcode()))
+            if (CurrentFinalBB->empty() || !llvm::Instruction::isTerminator(CurrentFinalBB->back().getOpcode()))
                 builder->CreateBr(FinalRetBB);
             builder->SetInsertPoint(FinalRetBB);
             // need load the return val.
@@ -195,6 +201,9 @@ llvm::Function *FunctionDecl::CodeGen(CompileUnitDecl *U) {
             U->Symbol.LeaveScope();
 
             llvm::verifyFunction(*F, &llvm::errs());
+#if !defined(NDEBUG)
+            F->viewCFG(false, nullptr, nullptr);
+#endif
             return F;
         }
     }

@@ -19,8 +19,16 @@ void DeclStmt::setType(TypeInfo *type) {
 }
 
 Value *DeclStmt::CodeGen(CompileUnitDecl *U) {
+    auto builder = U->getBuilder();
     for (auto decl : Decls) {
-        decl->CodeGen(U);
+        auto LocalVarAlloca = decl->CodeGen(U);
+        auto Init = decl->getInit();
+        if (Init != nullptr) {
+            auto InitExpr = Init->CodeGen(U);
+            if (Init->getValueKind() == ExprStmt::LValue)
+                InitExpr = builder->CreateLoad(InitExpr->getType()->getPointerElementType(), InitExpr);
+            builder->CreateStore(InitExpr, LocalVarAlloca);
+        }
     }
 }
 
@@ -121,7 +129,7 @@ Value *IfStmt::CodeGen(CompileUnitDecl *U) {
         ThenBB = builder->GetInsertBlock();
         /// \fixme : a better approach is dyn_cast<Instruction>()->isTerminator()
         /// to repair all early branch problem.
-        if (!Instruction::isTerminator(ThenBB->back().getOpcode()))
+        if (ThenBB->empty() || !Instruction::isTerminator(ThenBB->back().getOpcode()))
             builder->CreateBr(MergeBB);
         // Update Then block;
         // if then block generate multiple BB,
@@ -131,7 +139,7 @@ Value *IfStmt::CodeGen(CompileUnitDecl *U) {
         builder->SetInsertPoint(ElseBB);
         if (Else != nullptr) Else->CodeGen(U);
         ElseBB = builder->GetInsertBlock();
-        if (!Instruction::isTerminator(ElseBB->back().getOpcode()))
+        if (ElseBB->empty() || !Instruction::isTerminator(ElseBB->back().getOpcode()))
             builder->CreateBr(MergeBB);
         F->getBasicBlockList().push_back(MergeBB);
         builder->SetInsertPoint(MergeBB);
@@ -149,10 +157,12 @@ llvm::Value *WhileStmt::CodeGen(CompileUnitDecl *U) {
     // Get parent function.
     auto F = builder->GetInsertBlock()->getParent();
     // Condition Block
-    auto CondBB = BasicBlock::Create(*context, "wcond", F);
-    if (!Instruction::isTerminator(CondBB->back().getOpcode()))
+    auto CondBB = BasicBlock::Create(*context, "wcond");
+    auto CurrentFinalBB = builder->GetInsertBlock();
+    if (CurrentFinalBB->empty() || !Instruction::isTerminator(CondBB->back().getOpcode()))
         builder->CreateBr(CondBB);
     builder->SetInsertPoint(CondBB);
+    F->getBasicBlockList().push_back(CondBB);
     Value *CondV = Cond->CodeGen(U);
     CHECK(CondV->getType()->isSingleValueType())
         << "Expect a scalar type in `while` condition";
@@ -202,9 +212,12 @@ Value *CallStmt::CodeGen(CompileUnitDecl *U) {
     CHECK(F) << "Call unknown function " << Callee;
     llvm::SmallVector<llvm::Value *, 10> ArgsV;
     for (ExprStmt *&Expr : Args) {
-      ArgsV.push_back(Expr->CodeGen(U));
+        auto Arg = Expr->CodeGen(U);
+        if (Expr->getValueKind() == ExprStmt::LValue)
+            Arg = builder->CreateLoad(Arg->getType()->getPointerElementType(), Arg);
+        ArgsV.push_back(Arg);
     }
-    return builder->CreateCall(F, ArgsV, llvm::Twine("Call", Callee));
+    return builder->CreateCall(F, ArgsV );
 }
 
 //===-- DeclRefStmt --===//
@@ -298,15 +311,16 @@ Value *ReturnStmt::CodeGen(CompileUnitDecl *U) {
     // It's an alternative to add a final ret BB, and let
     // any internal return br to this final BB.
     auto builder = U->getBuilder();
-    llvm::Value *RetV = RetExpr->CodeGen(U);
-    if (RetExpr->getValueKind() == ExprStmt::LValue) {
-        // RetV is a alloca.
-        auto LoadRetVar = builder->CreateLoad(RetV->getType()->getPointerElementType(), RetV);
-        return builder->CreateRet(LoadRetVar);
-    }
-    else {
+    if (RetExpr != nullptr) {
+        llvm::Value *RetV = RetExpr->CodeGen(U);
+        if (RetExpr->getValueKind() == ExprStmt::LValue) {
+            // RetV is a alloca.
+            auto LoadRetVar = builder->CreateLoad(RetV->getType()->getPointerElementType(), RetV);
+            return builder->CreateRet(LoadRetVar);
+        }
         return builder->CreateRet(RetV);
     }
+    return builder->CreateRet(nullptr);
 }
 
 
@@ -359,6 +373,21 @@ static Value *doLess(IRBuilder<> *builder, Value *LHS, Value *RHS, bool isSigned
     }
     if (LHS->getType()->isDoubleTy() || LHS->getType()->isFloatTy()) {
         return builder->CreateFCmpOLT(LHS, RHS);
+    }
+    return nullptr;
+}
+
+static Value *doLessEqual(IRBuilder<> *builder, Value *LHS, Value *RHS, bool isSigned) {
+    // We suppose after semantic analysis or carefully
+    // write code, LHS and RHS has the same type.
+    if (LHS->getType()->isIntegerTy()) {
+        auto LType = dyn_cast<IntegerType>(LHS->getType());
+        auto RType = dyn_cast<IntegerType>(RHS->getType());
+        if (isSigned) return builder->CreateICmpSLE(LHS, RHS);
+        else return builder->CreateICmpULE(LHS, RHS);
+    }
+    if (LHS->getType()->isDoubleTy() || LHS->getType()->isFloatTy()) {
+        return builder->CreateFCmpOLE(LHS, RHS);
     }
     return nullptr;
 }
@@ -423,7 +452,7 @@ Value *BinaryOperatorStmt::CodeGen(CompileUnitDecl *U) {
         case Assign :   return builder->CreateStore(Operands[1], Operands[0]);
         case Greater :  return doGreater(builder, Operands[0], Operands[1], isSigned);
         case Less :     return doLess(builder, Operands[0], Operands[1], isSigned);
-        case Equal :    return doEqual(builder, Operands[0], Operands[1]);
+        case LessEqual :    return doLessEqual(builder, Operands[0], Operands[1], isSigned);
         case NotEqual : return doNEqual(builder, Operands[0], Operands[1]);
         default:
             LOG(FATAL) << "Not Implemented binary operation";

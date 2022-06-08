@@ -84,6 +84,7 @@ void ReturnStmt::dump() {
     else {
         DUMP_WITH_IDENT(dump_indent, Void);
     }
+    DUMP_NEWLINE("");
     dump_indent--;
 }
 

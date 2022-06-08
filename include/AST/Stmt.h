@@ -32,6 +32,7 @@ class ForStmt;
 class CompoundStmt;
 class ExprStmt;
 class CallStmt;
+class ReturnStmt;
 class ArraySubscriptStmt;
 class DeclRefStmt;
 class BinaryOperatorStmt;

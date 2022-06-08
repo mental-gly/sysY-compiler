@@ -6,6 +6,7 @@
 ///
 /// Refer to Clang AST Stmt & Decl designs.
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/APSInt.h"
@@ -53,10 +54,10 @@ public:
         NUM_STMTS
     };
 
-    unsigned getStmtID() const {
+    virtual unsigned getStmtID() const {
         return SubClassID;
     }
-public: 
+public:
     virtual llvm::Value *CodeGen(CompileUnitDecl *) = 0;
 #if !defined(NDEBUG)
     virtual void dump() = 0;
@@ -84,6 +85,9 @@ public:
     static bool classof(Stmt *S) {
         return S->getStmtID() == Stmt::kDeclStmt;
     }
+    virtual unsigned getStmtID() const override {
+        return SubClassID;
+    }
 #if !defined(NDEBUG)
     void dump() override;
 #endif
@@ -96,22 +100,22 @@ private:
 class CompoundStmt : public Stmt {
     uint8_t SubClassID { Stmt::kCompoundStmt };
 public:
-    using StmtListType = llvm::SmallVectorImpl<Stmt *>;
 public:
     CompoundStmt() = default;
     CompoundStmt(Stmt *StList);
 
 public:
     /// \brief Return the vector of statements in the compoundstmt.
-    const StmtListType &getStmtList() const {
-        return Stmts;
-    }
+    llvm::ArrayRef<Stmt *> getStmts() { return Stmts; }
     llvm::Value *CodeGen(CompileUnitDecl *) override;
     /// \brief add sub statements of Compound statement.
     void CreateSubStmt(Stmt *);
 
     static bool classof(Stmt *S) {
         return S->getStmtID() == Stmt::kCompoundStmt;
+    }
+    virtual unsigned getStmtID() const override {
+        return SubClassID;
     }
 #if !defined(NDEBUG)
     void dump() override;
@@ -128,6 +132,10 @@ public:
     IfStmt(ExprStmt *Cond, Stmt *Then, Stmt *Else = nullptr);
 public:
     llvm::Value *CodeGen(CompileUnitDecl *) override;
+
+    virtual unsigned getStmtID() const override {
+        return SubClassID;
+    }
 #if !defined(NDEBUG)
     void dump() override;
 #endif
@@ -146,6 +154,10 @@ public:
     bool hasBody() const { return Body != nullptr; }
     void setBody(Stmt *B) { Body = B; }
     llvm::Value *CodeGen(CompileUnitDecl *) override;
+
+    virtual unsigned getStmtID() const override {
+        return SubClassID;
+    }
 #if !defined(NDEBUG)
     void dump() override;
 #endif
@@ -197,6 +209,9 @@ public:
     static bool classof(Stmt *S) {
         return S->getStmtID() == Stmt::kExprStmt;
     }
+    virtual unsigned getStmtID() const override {
+        return SubClassID;
+    }
 protected:
     enum ExprValueKind ValueKind;
     TypeInfo *ExprType;
@@ -216,6 +231,9 @@ public:
 
     static bool classof(Stmt *S) {
         return S->getStmtID() == Stmt::kCallStmt;
+    }
+    virtual unsigned getStmtID() const override {
+        return SubClassID;
     }
 #if !defined(NDEBUG)
     void dump() override;
@@ -246,6 +264,9 @@ public:
     static bool classof(Stmt *S) {
         return S->getStmtID() == Stmt::kDeclRefStmt;
     }
+    virtual unsigned getStmtID() const override {
+        return SubClassID;
+    }
 #if !defined(NDEBUG)
     void dump() override;
 #endif
@@ -257,6 +278,7 @@ private:
 /// 'A' is Base and '4' is Idx.
 /// \example A[4] = 1;
 class ArraySubscriptStmt : public ExprStmt {
+    uint8_t SubClassID { Stmt::kArraySubscriptStmt };
 public:
     ArraySubscriptStmt() = delete;
     ArraySubscriptStmt(ExprStmt *base, ExprStmt *idx);
@@ -267,6 +289,9 @@ public:
 
     static bool classof(Stmt *S) {
         return S->getStmtID() == Stmt::kArraySubscriptStmt;
+    }
+    virtual unsigned getStmtID() const override {
+        return SubClassID;
     }
 #if !defined(NDEBUG)
     void dump() override;
@@ -289,6 +314,9 @@ public:
     llvm::Value *CodeGen(CompileUnitDecl *) override;
     static bool classof(Stmt *S) {
         return S->getStmtID() == Stmt::kReturnStmt;
+    }
+    virtual unsigned getStmtID() const override {
+        return SubClassID;
     }
 #if !defined(NDEBUG)
     void dump() override;
@@ -320,10 +348,14 @@ public:
     }
 public:
     uint32_t getOpcode() const { return Opcode; }
+    ExprStmt *getOperand(size_t Idx) const { return SubExprs[Idx]; }
     llvm::Value *CodeGen(CompileUnitDecl *) override;
     TypeInfo *getType(CompileUnitDecl *) override;
     static bool classof(const Stmt *S) {
         return S->getStmtID() == Stmt::kBinaryOperator;
+    }
+    virtual unsigned getStmtID() const override {
+        return SubClassID;
     }
 #if !defined(NDEBUG)
     void dump() override;
@@ -363,10 +395,14 @@ public:
     }
 public:
     uint32_t getOpcode() const { return Opcode; }
+    ExprStmt *getOperand(size_t Idx) const { return SubExpr; }
     llvm::Value *CodeGen(CompileUnitDecl *) override;
     TypeInfo *getType(CompileUnitDecl *) override;
     static bool classof(const Stmt *S) {
         return S->getStmtID() == Stmt::kBinaryOperator;
+    }
+    virtual unsigned getStmtID() const override {
+        return SubClassID;
     }
 #if !defined(NDEBUG)
     void dump() override;
@@ -398,6 +434,9 @@ public:
     static bool classof(const Stmt *S) {
         return S->getStmtID() == Stmt::kIntegerLiteral;
     }
+    virtual unsigned getStmtID() const override {
+        return SubClassID;
+    }
 #if !defined(NDEBUG)
     void dump() override;
 #endif
@@ -423,6 +462,9 @@ public:
     static bool classof(const Stmt *S) {
         return S->getStmtID() == Stmt::kFloatingLiteral;
     }
+    virtual unsigned getStmtID() const override {
+        return SubClassID;
+    }
 #if !defined(NDEBUG)
     void dump() override;
 #endif
@@ -444,6 +486,10 @@ public:
     }
     llvm::StringRef getVal() const { return Literal; }
     llvm::Value *CodeGen(CompileUnitDecl *) override;
+
+    virtual unsigned getStmtID() const override {
+        return SubClassID;
+    }
 #if !defined(NDEBUG)
     void dump() override;
 #endif

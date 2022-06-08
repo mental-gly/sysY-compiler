@@ -189,6 +189,7 @@ CompoundStmtList
         if ($2 != nullptr) {
             $1 -> Tail -> Next = $2;
             $1 -> Tail = $2;
+            $2 -> Next = nullptr;
             $$ = $1;
         }
     }
@@ -210,31 +211,21 @@ CompoundStmtList
 
 Stmt
 : DeclStmt {
-    auto comp_ptr = $1;
-    $$ = comp_ptr;
-    $$ -> Tail = comp_ptr;
+    $$ = $1;
     LOG(INFO) << "DeclStmt as CompoundStmt list header : " << $$;
 }
 | ReturnStmt {
-    auto comp_ptr = $1;
-    $$ = comp_ptr;
-    $$ -> Tail = comp_ptr;
+    $$ = $1;
 }
 | IfStmt {
-    auto comp_ptr = $1;
-    $$ = comp_ptr;
-    $$ -> Tail = comp_ptr;
+    $$ = $1;
     LOG(INFO) << "Add IF to CompoundStmt tail";
 }
 | WhileStmt {
-    auto comp_ptr = $1;
-    $$ = comp_ptr;
-    $$ -> Tail = comp_ptr;
+    $$ = $1;
 }
 | ExprStmt SEMICOLON {
-    auto comp_ptr = $1;
-    $$ = comp_ptr;
-    $$ -> Tail = comp_ptr;
+    $$ = $1;
 }
 | SEMICOLON {
     $$ = nullptr;

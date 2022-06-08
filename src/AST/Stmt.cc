@@ -19,7 +19,9 @@ void DeclStmt::setType(TypeInfo *type) {
 }
 
 Value *DeclStmt::CodeGen(CompileUnitDecl *U) {
-    // currently do nothing.
+    for (auto decl : Decls) {
+        decl->CodeGen(U);
+    }
 }
 
 //===-- CompoundStmt --===//

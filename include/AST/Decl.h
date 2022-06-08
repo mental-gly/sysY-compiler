@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <llvm/ADT/SmallVector.h>
+#include <llvm/ADT/ArrayRef.h>
 #include <llvm/ADT/ilist.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/IR/Function.h>
@@ -37,7 +38,7 @@ public:
         NUM_DECL
     };
 public:
-    unsigned getDeclID() const { return SubClassID; }
+    virtual unsigned getDeclID() const { return SubClassID; }
     llvm::StringRef getName() const { return Name; }
 #if !defined(NDEBUG)
     virtual void dump() = 0;
@@ -59,6 +60,7 @@ public:
     CompileUnitDecl(const std::string &FileName, Decl *Decls = nullptr);
 public:
     void CreateSubDecls(Decl *);
+    llvm::ArrayRef<Decl *> getDecls() { return Decls; }
     llvm::LLVMContext *getContext() const { return Context.get(); }
     llvm::IRBuilder<> *getBuilder() const { return Builder.get(); }
     llvm::Module *getModule() const { return Module.get(); }
@@ -118,6 +120,7 @@ public:
     /// declare global variable
     llvm::Value *CodeGen(CompileUnitDecl *);
 
+    virtual unsigned getDeclID() const override { return SubClassID; }
     static bool classof(const Decl *D) {
         return D->getDeclID() == Decl::kVarDecl;
     }
@@ -153,6 +156,7 @@ public:
     }
     // getType() public inherit from VarDecl::getType().
 
+    virtual unsigned getDeclID() const override { return SubClassID; }
     static bool classof(const Decl *D) {
         return D->getDeclID() == Decl::kParamDecl;
     }
@@ -174,6 +178,7 @@ public:
     llvm::Function* CodeGen(CompileUnitDecl *);
     /// \brief Returns true if the function has a function definition body.
     bool hasBody() const { return Body != nullptr; }
+    Stmt *getBody() const { return Body; }
     void setBody(Stmt *B) { Body = B; }
     /// \brief Returns true if the function has somewhere a definition
     bool hasDefinition(CompileUnitDecl *) const;
@@ -185,6 +190,7 @@ public:
         return Params;
     }
 
+    virtual unsigned getDeclID() const override { return SubClassID; }
     static bool classof(const Decl *D) {
         return D->getDeclID() == Decl::kFunctionDecl;
     }

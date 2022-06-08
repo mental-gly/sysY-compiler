@@ -57,8 +57,17 @@ llvm::Value *VarDecl::CodeGen(CompileUnitDecl *U) {
     auto EntryTerminator = EntryBB->getTerminator();
     auto CurBB = builder->GetInsertBlock();
     // make local variable alloca.
-    builder->SetInsertPoint(EntryTerminator);
-    return builder->CreateAlloca(getType()->Type, 0, Name);
+    if (EntryTerminator != nullptr) {
+        builder->SetInsertPoint(EntryTerminator);
+    }
+    else {
+        builder->SetInsertPoint(EntryBB);
+    }
+    auto LocalVarAlloca =  builder->CreateAlloca(getType()->Type, 0, Name);
+    if (init_expr != nullptr) {
+        auto InitExpr = init_expr->CodeGen(U);
+        builder->CreateStore(InitExpr, LocalVarAlloca);
+    }
 }
 
 //===-- FunctionDecl --===//

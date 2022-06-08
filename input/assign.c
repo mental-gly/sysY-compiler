@@ -9,3 +9,5 @@ int g() {
     c = 1;
     return c;
 }
+
+void h();

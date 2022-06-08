@@ -91,7 +91,9 @@ FunctionDecl::FunctionDecl(TypeInfo *return_type, const std::string &name, Param
     : Decl(name)
 {
     ReturnType = return_type;
-    for (auto param = params; param != nullptr; param = static_cast<ParamDecl *>(param->Next)) {
+    for (auto param = params;
+              param != nullptr;
+              param = static_cast<ParamDecl *>(param->Next)) {
         Params.push_back(param);
     }
     Body = nullptr;
@@ -163,8 +165,9 @@ llvm::Function *FunctionDecl::CodeGen(CompileUnitDecl *U) {
     //  1. if this function do not exist, add a prototype and return this function.
     //  2. if the existing function has the correct prototype, return the existing one.
     //  3. if the existing function has the wrong prototype, the function is a constantexpr cast to right prototype.
-    llvm::FunctionCallee FWrapper = module->getOrInsertFunction(Name, FunT);
-    if (auto F = llvm::dyn_cast<llvm::Function>(FWrapper.getCallee())) {
+    auto F = module->getFunction(Name);
+    if (F == nullptr) {
+        F = llvm::Function::Create(FunT, llvm::Function::ExternalLinkage, Name, module);
         // If the FunctionDecl has a Stmt body,
         // generate the code, the F would be automatically
         // transformed from \p declare into a \p define
@@ -191,14 +194,15 @@ llvm::Function *FunctionDecl::CodeGen(CompileUnitDecl *U) {
             }
             // Generate definition.
             Body->CodeGen(U);
+            auto CurrentFinalBB = builder->GetInsertBlock();
+            if (CurrentFinalBB->empty() || !llvm::Instruction::isTerminator(CurrentFinalBB->back().getOpcode()))
+                builder->CreateBr(FinalRetBB);
             // do Replace All Return With Store.
             doRARWS(builder, F, F->getReturnType()->isVoidTy(), RetValAlloca, FinalRetBB);
             // deal with final ret,
             // if there is no ret, we add a final ret.
             F->getBasicBlockList().push_back(FinalRetBB);
-            auto CurrentFinalBB = builder->GetInsertBlock();
-            if (CurrentFinalBB->empty() || !llvm::Instruction::isTerminator(CurrentFinalBB->back().getOpcode()))
-                builder->CreateBr(FinalRetBB);
+
             builder->SetInsertPoint(FinalRetBB);
             // need load the return val.
             llvm::Value *RetVal = nullptr;
@@ -210,11 +214,11 @@ llvm::Function *FunctionDecl::CodeGen(CompileUnitDecl *U) {
             U->Symbol.LeaveScope();
 
             llvm::verifyFunction(*F, &llvm::errs());
-#if !defined(NDEBUG)
+#if defined(SHOW_CFG)
             F->viewCFG(false, nullptr, nullptr);
 #endif
-            return F;
         }
+        return F;
     }
     LOG(FATAL) << "Conflicting type for " << "'" << Name << "'";
     return nullptr;

@@ -65,7 +65,7 @@ static Decl *iden_tail;
 }
 
 %type <str_val> basicType 
-%type <func_val> FunctionDecl CompileUnit
+%type <func_val> FunctionDecl CompileUnit Function
 %type <param_val> ParamList ParamDecl
 %type <ident_val> IdentifierList  VarDecl
 %type <comp_val> Program
@@ -104,27 +104,35 @@ CompileUnit
 }
 | FunctionDecl{
     auto func_decl =  $1;
+    $1->Next = nullptr;
     func_decl_tail = func_decl;
     $$ = func_decl;
-    $$->Next = nullptr;
 }
 ;
 
-FunctionDecl 
-: basicType IDENTIFIER OPENPAREN ParamList CLOSEPAREN Block{
+FunctionDecl
+: Function Block{
+    $1->setBody($2);
+    $$ = $1;
+}
+| Function SEMICOLON {
+    $$->setBody(nullptr);
+    $$ = $1;
+}
+
+Function
+: basicType IDENTIFIER OPENPAREN ParamList CLOSEPAREN {
     auto type = $1;
     auto ident = $2;
     auto param_list = $4;
-    auto block = $6;
     LOG(INFO) << "Function "<< *ident;
     $$ = new FunctionDecl(TypeContext::find(*type), *ident, static_cast<ParamDecl*>(param_list));
-    $$ -> setBody(block);
 }
-| basicType IDENTIFIER OPENPAREN ParamList CLOSEPAREN SEMICOLON{
+| basicType IDENTIFIER OPENPAREN  CLOSEPAREN {
     auto type = $1;
     auto ident = $2;
-    auto param_list = $4;
-    $$ = new FunctionDecl(TypeContext::find(*type), *ident, static_cast<ParamDecl*>(param_list));
+    LOG(INFO) << "Function "<< *ident;
+    $$ = new FunctionDecl(TypeContext::find(*type), *ident, nullptr);
 }
 ;
 
@@ -135,6 +143,7 @@ ParamList
     $$ = $1;
 }
 | ParamList COMMA ParamDecl {
+    $3->Next = nullptr;
     param_decl_tail->Next = $3;
     param_decl_tail = $3;
     $$ = $1;
@@ -292,8 +301,11 @@ DeclStmt
     auto type = $1;
     auto ident = $2;
     auto var = new VarDecl(*ident);
+    var->Next = nullptr;
+    var->setInit(nullptr);
     auto num = $4 -> getVal();
     $$ = new DeclStmt(var);
+    LOG(INFO) << "Array Var";
     $$ -> setType(REGISTER_ARRAY(*type, num));
 }
 ;
@@ -349,6 +361,9 @@ Expr
 }
 |  ExprStmt LESEQ ExprStmt{
     $$ = new BinaryOperatorStmt(BinaryOperatorStmt::LessEqual, static_cast<ExprStmt*>($1), static_cast<ExprStmt*>($3));  
+}
+| BIAND ExprStmt {
+    $$ = new UnaryOperatorStmt(UnaryOperatorStmt::Addr, static_cast<ExprStmt*>($2));
 }
 | DeclRefStmt {
     $$ = $1;
@@ -445,6 +460,7 @@ VarDecl
 : IDENTIFIER {
     auto Var = new VarDecl(*$1);
     Var->Next = nullptr;
+    Var->setInit(nullptr);
     $$ = Var;
 }
 | IDENTIFIER ASSIGN ExprStmt {

@@ -1,3 +1,4 @@
+use std.io;
 
 void gemm(int a[], int An, int Am,
           int b[], int Bn, int Bm,
@@ -22,12 +23,16 @@ void gemm(int a[], int An, int Am,
     }
 }
 
+
 int main() {
     int a[1000];
     int b[1000];
     int c[1000];
-    int An, Am, Bn, Bm;
-    scanf("%d%d%d%d", &An, &Am);
+    int An;
+    int Am;
+    int Bn;
+    int Bm;
+    scanf("%d%d", &An, &Am);
     int i = 0;
     int j = 0;
     while (i < An) {
@@ -38,7 +43,7 @@ int main() {
         }
         i = i + 1;
     }
-    scanf("%d%d%d%d", &Bn, &Bm);
+    scanf("%d%d", &Bn, &Bm);
     i = 0;
     while (i < Bn) {
         j = 0;
@@ -52,11 +57,13 @@ int main() {
         printf("Incompatiable Dimension\n");
         return 0;
     }
-    gemm(a, An, Am, b, Bn, Bm);
+
+    gemm(&a[0], An, Am, &b[0], Bn, Bm, &c[0]);
+    i = 0;
     while (i < An) {
         j = 0;
         while (j < Bm) {
-            printf("%d", c[i * Bm + j]);
+            printf("%10d", c[i * Bm + j]);
             j = j + 1;
         }
         printf("\n");

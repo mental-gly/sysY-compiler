@@ -159,7 +159,7 @@ int main(){
             //remaining 培养方案中还有多少学分没有修读，包括成绩为 `F` 的课程
             remaining = sumcredit - completed;
             //满足前置课程条件，可以修读的课程但还没有获得学分的课程。必须按照课程出现在输入中的先后顺序进行输出。
-            if(PreviousClassesTaken(pre[Course[i]], gpa) == true && (gpa[Course[i]] == 0 || gpa[Course[i]] == -1)) {
+            if(PreviousClassesTaken(&pre[Course[i]][0], &gpa[0]) == true && (gpa[Course[i]] == 0 || gpa[Course[i]] == -1)) {
                 reccnt++;
                 char tmp[100];
                 sprintf(tmp, "%c%d", 'c', Course[i]);

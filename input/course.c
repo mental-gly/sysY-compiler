@@ -113,14 +113,14 @@ int main(){
         int cnt;
         cnt = 0;
         int course;
-        course = getCourse(str,1);
+        course = getCourse(&str[0],1);
         Course[coursecnt] = course;
         coursecnt = coursecnt + 1;
         int cur_credit;
-        cur_credit = getCourse(str,2);
+        cur_credit = getCourse(&str[0],2);
         sumcredit = sumcredit + cur_credit;
         int cur_gpa;
-        cur_gpa = getCourse(str,3);
+        cur_gpa = getCourse(&str[0],3);
         credit[course] = cur_credit;
         gpa[course] = cur_gpa;
         char* res;

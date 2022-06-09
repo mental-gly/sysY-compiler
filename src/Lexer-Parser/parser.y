@@ -308,6 +308,15 @@ DeclStmt
     LOG(INFO) << "Array Var";
     $$ -> setType(REGISTER_ARRAY(*type, num));
 }
+| basicType MUL IDENTIFIER SEMICOLON{
+    auto type = $1;
+    auto ident = $3;
+    auto var = new VarDecl(*ident);
+    var->Next = nullptr;
+    var->setInit(nullptr);
+    $$ = new DeclStmt(var);
+    $$ -> setType(REGISTER_POINTER(*type));
+}
 ;
 
 ExprStmt

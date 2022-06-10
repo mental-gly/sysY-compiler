@@ -48,13 +48,13 @@ int main() {
     while (i < Bn) {
         j = 0;
         while (j < Bm) {
-            scanf("%d", &b[i * Am + j]);
+            scanf("%d", &b[i * Bm + j]);
             j = j + 1;
         }
         i = i + 1;
     }
     if (Am != Bn) {
-        printf("Incompatiable Dimension\n");
+        printf("Incompatible Dimensions\n");
         return 0;
     }
 

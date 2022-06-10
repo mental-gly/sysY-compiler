@@ -10,7 +10,6 @@ void quick_sort(int a[], int l, int r) {
     while (i <= j) {
         while (a[i] < x) { i = i + 1; }
         while (a[j] > x) { j = j - 1; }
-        printf("%d %d\n", i, j);
         if (i <= j) {
             int t = a[i];
             a[i]= a[j];
@@ -23,4 +22,21 @@ void quick_sort(int a[], int l, int r) {
     quick_sort(a, l, j);
     quick_sort(a, i, r);
     return;
+}
+
+int main() {
+    int a[10001];
+    int N;
+    scanf("%d", &N);
+    int i = 0;
+    while (i < N) {
+        scanf("%d", &a[i]);
+        i = i + 1;
+    }
+    quick_sort(&a[0], 0, N - 1);
+    i = 0;
+    while (i < N) {
+        printf("%d\n", a[i]);
+        i = i + 1;
+    }
 }

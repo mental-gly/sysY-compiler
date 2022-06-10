@@ -4,6 +4,9 @@
 #include "llvm/Support/Host.h"
 #include "llvm/Pass.h"
 #include "llvm/Passes/PassBuilder.h"
+#include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Utils.h"
+#include "llvm/Transforms/Vectorize.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
@@ -14,7 +17,12 @@
 #include <unistd.h>
 #include "AST/Decl.h"
 #include <string>
+#include <cstdio>
 #include <system_error>
+
+extern FILE *yyin;
+extern int yyparse(CompileUnitDecl &comp_unit);
+
 using namespace llvm;
 
 enum OptLevel {
@@ -31,9 +39,9 @@ cl::opt<OptLevel> OptimizationLevel(cl::desc("Optimization level:"),
                                             clEnumVal(O3, "enable aggressive optimizations")
                                             ),
                                     cl::init(O0));
-cl::opt<bool> EmitAssembly("S", cl::desc("emit LLVM IR"));
-cl::opt<bool> EmitLLVMFile("emit-llvm", cl::desc("emit LLVM IR '.ll' or '.bc' file"))
-cl::opt<bool> EmitObject("c", cl::desc("emit object file"));
+cl::opt<bool> EmitAssembly("S", cl::desc("emit LLVM IR"), cl::init(false));
+cl::opt<bool> EmitLLVMFile("emit-llvm", cl::desc("emit LLVM IR '.ll' or '.bc' file"), cl::init(false));
+cl::opt<bool> EmitObject("c", cl::desc("emit object file"), cl::init(false));
 
 CompileUnitDecl *ParseAST();
 Module *GenLLVMIR(CompileUnitDecl *Unit) {
@@ -74,7 +82,7 @@ TargetMachine *GetTargetMachine(Module *module) {
 void EmitObjectFile(Module *module, TargetMachine *target) {
     // Configuring output filesystem.
     std::string ObjectFileName;
-    if (OutputFileName.c_str()) {
+    if (!OutputFileName.empty()) {
         ObjectFileName = OutputFileName;
     } else {
         ObjectFileName = InputFileName + ".o";
@@ -82,7 +90,7 @@ void EmitObjectFile(Module *module, TargetMachine *target) {
     std::error_code ErrorCode;
     raw_fd_ostream dest(ObjectFileName, ErrorCode, sys::fs::OF_None);
     if (ErrorCode) {
-        errs() << "Could not open file: " << ErrorCode.message();
+        errs() << "Could not open file: " << ErrorCode.message() << "\n";
         exit(1);
     }
 
@@ -91,7 +99,7 @@ void EmitObjectFile(Module *module, TargetMachine *target) {
     legacy::PassManager pass;
 
     if (target->addPassesToEmitFile(pass, dest, nullptr, FileType)) {
-        errs() << "TargetMachine can't emit object file";
+        errs() << "TargetMachine can't emit object file" << "\n";
         exit(1);
     }
 
@@ -102,7 +110,7 @@ void EmitObjectFile(Module *module, TargetMachine *target) {
 void EmitLLVMIR(Module *module) {
     // Configuring output filesystem.
     std::string IRFileName;
-    if (IRFileName.c_str()) {
+    if (!IRFileName.empty()) {
         IRFileName = OutputFileName;
     } else {
         IRFileName = InputFileName + ".ll";
@@ -110,7 +118,7 @@ void EmitLLVMIR(Module *module) {
     std::error_code ErrorCode;
     raw_fd_ostream dest(IRFileName, ErrorCode, sys::fs::OF_None);
     if (ErrorCode) {
-        errs() << "Could not open file: " << ErrorCode.message();
+        errs() << "Could not open file: " << ErrorCode.message() << "\n";
         exit(1);
     }
     // write to .S
@@ -134,6 +142,8 @@ void RunOptPasses(Module *module, TargetMachine *target) {
     PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
     // Create passmanager and run optimization.
     PassBuilder::OptimizationLevel OptLevel;
+
+
     ModulePassManager MPM;
     switch (OptimizationLevel) {
         case O0 : OptLevel = PassBuilder::OptimizationLevel::O0;
@@ -144,17 +154,27 @@ void RunOptPasses(Module *module, TargetMachine *target) {
     if (OptimizationLevel == O0)
         MPM = PB.buildO0DefaultPipeline(OptLevel);
     else
-        MPM = PB.buildModuleOptimizationPipeline(OptLevel);
+        MPM = PB.buildPerModuleDefaultPipeline(OptLevel);
+
+    std::cout << "opt level: " << OptimizationLevel << "\n";
     MPM.run(*module, MAM);
 }
 
 int main(int argc, char **argv, char **envp) {
     cl::ParseCommandLineOptions(argc, argv);
 
-    CompileUnitDecl *Unit = ParseAST();
+    yyin = fopen(InputFileName.c_str(), "r");
+    auto Unit = new CompileUnitDecl(InputFileName);
+    TypeContext::Init(Unit->getContext());
+    auto status = yyparse(*Unit);
+    if (status != 0) {
+        // do something dealing with parsing error.
+    }
+
     Module *module = GenLLVMIR(Unit);
     TargetMachine *target = GetTargetMachine(module);
     RunOptPasses(module, target);
+
     if (EmitAssembly) {
         EmitLLVMIR(module);
     }
@@ -163,11 +183,12 @@ int main(int argc, char **argv, char **envp) {
     }
     else {
         // GNU gold linker command line.
-        char *ld_argv[] = {"ld", "-e", "main", "-o", "a.out"};
+        // link mode. -no-pie (generate executable).
+        char *ld_argv[] = {"gcc", "test.o", "-no-pie", "-o", "a.out"};
         if (!OutputFileName.empty()) {
             ld_argv[4] = const_cast<char *>(OutputFileName.c_str());
         }
-        execve("/usr/bin/ld", ld_argv, envp);
+        status = execve("/usr/bin/gcc", ld_argv, envp);
     }
     return 0;
 }

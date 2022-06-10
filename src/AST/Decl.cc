@@ -18,6 +18,8 @@ static void RegisterBuiltinStdio(CompileUnitDecl *U) {
     auto FunT = llvm::FunctionType::get(IntRetT, CharArgT, true);
     llvm::Function::Create(FunT, llvm::Function::ExternalLinkage, "scanf", module);
     llvm::Function::Create(FunT, llvm::Function::ExternalLinkage, "printf", module);
+    auto FunGetsT = llvm::FunctionType::get(CharArgT, CharArgT);
+    llvm::Function::Create(FunGetsT, llvm::Function::ExternalLinkage, "gets", module);
 }
 
 CompileUnitDecl::CompileUnitDecl(const std::string &FileName, Decl *decls)

@@ -5,6 +5,7 @@
 /// \brief TypeInfo class describe type equivalence
 #include "llvm/IR/Type.h"
 #include "llvm/IR/LLVMContext.h"
+#include "llvm/ADT/ArrayRef.h"
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -66,7 +67,7 @@ public:
     static TypeInfo *createPointerType(const std::string &name_key);
 
     /// \brief register array type \p T[] given type name \p T.
-    static TypeInfo *createArrayType(const std::string &name_key, size_t length);
+    static TypeInfo *createArrayType(const std::string &name_key, llvm::ArrayRef<size_t> Length);
 
     [[maybe_unused]] static TypeInfo &createStructType(const std::string &name_key, const std::vector<TypeInfo *> members) {
         LOG(FATAL) << "Struct is not supported!";
@@ -85,7 +86,7 @@ private:
 
 #define REGISTER_NUMERIC(X) TypeContext::createNumericType(#X, sizeof(X))
 #define REGISTER_POINTER(X) TypeContext::createPointerType(X)
-#define REGISTER_ARRAY(X, LEN) TypeContext::createArrayType(X, LEN)
+#define REGISTER_ARRAY(X, ...) TypeContext::createArrayType(X, {__GNUC_VA_LIST})
 
 
 

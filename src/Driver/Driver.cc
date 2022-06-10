@@ -42,6 +42,9 @@ cl::opt<OptLevel> OptimizationLevel(cl::desc("Optimization level:"),
 cl::opt<bool> EmitAssembly("S", cl::desc("emit LLVM IR"), cl::init(false));
 cl::opt<bool> EmitLLVMFile("emit-llvm", cl::desc("emit LLVM IR '.ll' or '.bc' file"), cl::init(false));
 cl::opt<bool> EmitObject("c", cl::desc("emit object file"), cl::init(false));
+cl::opt<std::string> RuntimeHeaderDir("I", cl::desc("directory of builtin runtime function header llvm .ll files"),
+                                      cl::value_desc("directory"),
+                                      cl::init(RUNTIME_HEADER));
 
 CompileUnitDecl *ParseAST();
 Module *GenLLVMIR(CompileUnitDecl *Unit) {
@@ -110,7 +113,7 @@ void EmitObjectFile(Module *module, TargetMachine *target) {
 void EmitLLVMIR(Module *module) {
     // Configuring output filesystem.
     std::string IRFileName;
-    if (!IRFileName.empty()) {
+    if (!OutputFileName.empty()) {
         IRFileName = OutputFileName;
     } else {
         IRFileName = InputFileName + ".ll";
@@ -121,8 +124,8 @@ void EmitLLVMIR(Module *module) {
         errs() << "Could not open file: " << ErrorCode.message() << "\n";
         exit(1);
     }
-    // write to .S
     module->print(dest, nullptr);
+    // write to .S
     dest.flush();
 }
 
@@ -166,6 +169,7 @@ int main(int argc, char **argv, char **envp) {
     yyin = fopen(InputFileName.c_str(), "r");
     auto Unit = new CompileUnitDecl(InputFileName);
     TypeContext::Init(Unit->getContext());
+    Unit->setRuntimeHeader(RuntimeHeaderDir);
     auto status = yyparse(*Unit);
     if (status != 0) {
         // do something dealing with parsing error.
@@ -174,7 +178,6 @@ int main(int argc, char **argv, char **envp) {
     Module *module = GenLLVMIR(Unit);
     TargetMachine *target = GetTargetMachine(module);
     RunOptPasses(module, target);
-
     if (EmitAssembly) {
         EmitLLVMIR(module);
     }
@@ -182,13 +185,22 @@ int main(int argc, char **argv, char **envp) {
         EmitObjectFile(module, target);
     }
     else {
+        std::string ObjectFileName;
+        if (!OutputFileName.empty()) {
+            ObjectFileName = OutputFileName;
+        } else {
+            ObjectFileName = InputFileName + ".o";
+        }
+        EmitObjectFile(module, target);
         // GNU gold linker command line.
         // link mode. -no-pie (generate executable).
-        char *ld_argv[] = {"gcc", "test.o", "-no-pie", "-o", "a.out"};
+        char *ld_argv[] = {"gcc", "example.c.o", "-no-pie", "-o", "a.out", NULL};
+        ld_argv[1] = const_cast<char *>(ObjectFileName.c_str());
         if (!OutputFileName.empty()) {
             ld_argv[4] = const_cast<char *>(OutputFileName.c_str());
         }
         status = execve("/usr/bin/gcc", ld_argv, envp);
+         // remove(ObjectFileName.c_str());
     }
     return 0;
 }

@@ -29,7 +29,7 @@ add_definitions(${LLVM_DEFINITIONS})
 # llvm libraries use built-in rtti
 add_compile_options(-fno-exceptions -fno-rtti)
 add_compile_options(-ltinfo -lpthread)
-
+add_definitions(-DRUNTIME_HEADER="${CMAKE_SOURCE_DIR}/runtime/")
 
 # set default cmake build type as Debug
 if (NOT CMAKE_BUILD_TYPE)

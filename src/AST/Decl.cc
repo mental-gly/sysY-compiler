@@ -5,22 +5,77 @@
 #include "llvm/IR/InstIterator.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Linker/Linker.h"
+#include "llvm/IRReader/IRReader.h"
+#include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 
 extern bool ImportStdio;
+extern bool ImportString;
 //===-- CompileUnit --===//
 
-static void RegisterBuiltinStdio(CompileUnitDecl *U) {
+static void LoadBuiltinFunction(CompileUnitDecl *U) {
+    auto HeaderPath = U->getRuntimeHeader();
     auto context = U->getContext();
     auto module = U->getModule();
-    auto IntRetT = llvm::Type::getInt32Ty(*context);
-    auto CharArgT = llvm::PointerType::get(llvm::Type::getInt8Ty(*context), 0);
-    auto FunT = llvm::FunctionType::get(IntRetT, CharArgT, true);
-    llvm::Function::Create(FunT, llvm::Function::ExternalLinkage, "scanf", module);
-    llvm::Function::Create(FunT, llvm::Function::ExternalLinkage, "printf", module);
-    auto FunGetsT = llvm::FunctionType::get(CharArgT, CharArgT);
-    llvm::Function::Create(FunGetsT, llvm::Function::ExternalLinkage, "gets", module);
+    /*
+    llvm::Linker linker(*module);
+
+    llvm::SMDiagnostic Err;
+    llvm::LLVMContext Ctx;
+    std::unique_ptr<llvm::Module> M;
+    if (ImportStdio) {
+        M = llvm::parseIRFile(HeaderPath + "stdio.ll", Err, Ctx);
+        if (!M) {
+            Err.print("Error Loading stdio.ll\n", llvm::errs());
+        }
+        linker.linkInModule(std::move(M));
+        auto F = module->getFunction("stdio");
+        if (F != nullptr) F->eraseFromParent();
+    }
+    if (ImportString) {
+        M = llvm::parseIRFile(HeaderPath + "string.ll", Err, Ctx);
+        if (!M) {
+            Err.print("Error Loading string.ll\n", llvm::errs());
+        }
+        linker.linkInModule(std::move(M));
+        auto F = module->getFunction("string");
+        if (F != nullptr) F->eraseFromParent();
+    }
+    module->print(llvm::errs(), nullptr);
+    */
+    auto StrT = llvm::Type::getInt8PtrTy(*context);
+    auto IntT = llvm::Type::getInt32Ty(*context);
+    auto SizeT = llvm::Type::getInt64Ty(*context);
+    auto VoidPtrT = llvm::PointerType::get(llvm::Type::getVoidTy(*context), 0);
+    auto IOFormatT = llvm::FunctionType::get(IntT, StrT, true);
+    auto Printf = llvm::Function::Create(IOFormatT, llvm::Function::ExternalLinkage, "printf", module);
+    auto Scanf = llvm::Function::Create(IOFormatT, llvm::Function::ExternalLinkage, "scanf", module);
+
+    auto StrIOFormatT = llvm::FunctionType::get(IntT, {StrT, StrT}, true);
+    auto SPrintf = llvm::Function::Create(StrIOFormatT, llvm::Function::ExternalLinkage, "sprintf", module);
+    auto SScanf = llvm::Function::Create(StrIOFormatT, llvm::Function::ExternalLinkage, "sscanf", module);
+
+    auto GetsT = llvm::FunctionType::get(StrT, StrT, false);
+    auto Gets = llvm::Function::Create(GetsT, llvm::Function::ExternalLinkage, "gets", module);
+
+    auto StrOpT = llvm::FunctionType::get(StrT, {StrT, StrT}, false);
+    auto StrCpy = llvm::Function::Create(StrOpT, llvm::Function::ExternalLinkage, "strcpy", module);
+
+    auto StrChrT = llvm::FunctionType::get(StrT, {StrT, IntT}, false);
+    auto StrChr = llvm::Function::Create(StrChrT, llvm::Function::ExternalLinkage, "strchr", module);
+
+    auto StrCmpT = llvm::FunctionType::get(IntT, {StrT, StrT}, false);
+    auto StrCmp = llvm::Function::Create(StrCmpT, llvm::Function::ExternalLinkage, "strcmp", module);
+
+
+    auto StrLenT = llvm::FunctionType::get(SizeT, StrT, false);
+    auto StrLen = llvm::Function::Create(StrLenT, llvm::Function::ExternalLinkage, "strlen", module);
+
+    auto MemSetT = llvm::FunctionType::get(VoidPtrT, {VoidPtrT, IntT, SizeT}, false);
+    auto MemSet = llvm::Function::Create(MemSetT, llvm::Function::ExternalLinkage, "memset", module);
 }
+
 
 CompileUnitDecl::CompileUnitDecl(const std::string &FileName, Decl *decls)
     :Decl(FileName)
@@ -50,7 +105,7 @@ void CompileUnitDecl::CreateSubDecls(Decl *DeList) {
 
 void CompileUnitDecl::CodeGen() {
     // deals with built in function.
-    if (ImportStdio) RegisterBuiltinStdio(this);
+    LoadBuiltinFunction(this);
     if (Decls.empty()) {
         LOG(WARNING) << Name << " has nothing to compile\n";
     }
@@ -215,8 +270,8 @@ llvm::Function *FunctionDecl::CodeGen(CompileUnitDecl *U) {
             builder->ClearInsertionPoint();
             U->Symbol.LeaveScope();
 
-            llvm::verifyFunction(*F, &llvm::errs());
 #if defined(SHOW_CFG)
+            llvm::verifyFunction(*F, &llvm::errs());
             F->viewCFG(false, nullptr, nullptr);
 #endif
         }

@@ -76,12 +76,15 @@ static Decl *iden_tail;
 %token T_CHAR T_INT T_STRING T_BOOL T_VOID
 %token COMMA SEMICOLON OPENPAREN CLOSEPAREN OPENBRACE CLOSEBRACE OPENBRACKET CLOSEBRACKET
 %token ADDR
+%token TRUE FALSE
 %token MOD BIAND BIOR NOT VOID
 %token ASSIGN PLUSASSIGN MINUSASSIGN MULASSIGN DIVASSIGN
 %token CONST IF ELSE WHILE BREAK CONTINUE RETURN
 %token EQ GRAEQ LESEQ NEQ GRA LES
-%token CHAR INTEGER STRING BOOLEAN
-%token <int_val> INT_CONST
+%token CHAR INTEGER STRING BOOLEAN DOUBLE
+%token CAST
+%token GENERIC_BEGIN GENERIC_END
+%token <int_val> INT_CONST CharConst
 %token <str_val> IDENTIFIER CONSTSTRING
 
 %left EQ
@@ -192,6 +195,12 @@ basicType
 }
 | VOID {
     $$ = new string("void");
+}
+| BOOLEAN {
+    $$ = new string("bool");
+}
+| DOUBLE {
+    $$ = new string("double");
 }
 ;
 
@@ -306,7 +315,20 @@ DeclStmt
     auto num = $4 -> getVal();
     $$ = new DeclStmt(var);
     LOG(INFO) << "Array Var";
-    $$ -> setType(REGISTER_ARRAY(*type, num));
+    $$ -> setType(TypeContext::createArrayType(*type, num));
+}
+| basicType IDENTIFIER OPENBRACKET IntegerLiteral CLOSEBRACKET OPENBRACKET IntegerLiteral CLOSEBRACKET SEMICOLON{
+    auto type = $1;
+    auto ident = $2;
+    auto var = new VarDecl(*ident);
+    var->Next = nullptr;
+    var->setInit(nullptr);
+    auto num_1 = $4 -> getVal();
+    auto num_2 = $7 -> getVal();
+    $$ = new DeclStmt(var);
+    LOG(INFO) << "Array Var";
+    // Reverse Order.
+    $$ -> setType(TypeContext::createArrayType(*type, {num_2, num_1}));
 }
 | basicType MUL IDENTIFIER SEMICOLON{
     auto type = $1;
@@ -386,6 +408,10 @@ Expr
 | CallStmt {
     $$ = $1;
 }
+| CAST GENERIC_BEGIN basicType GENERIC_END OPENPAREN ExprStmt CLOSEPAREN {
+    auto DestType = TypeContext::find(*$3);
+    $$ = new Cast(static_cast<ExprStmt *>($6), DestType);
+}
 ;
 
 IntegerLiteral
@@ -393,6 +419,19 @@ IntegerLiteral
     auto IntType = TypeContext::find("int");
     auto num = $1;
     $$ = new IntegerLiteral(IntType, num);
+}
+| CharConst {
+    auto CharType = TypeContext::find("char");
+    auto num = $1;
+    $$ = new IntegerLiteral(CharType, num);
+}
+| TRUE {
+    auto BoolType = TypeContext::find("bool");
+    $$ = new IntegerLiteral(BoolType, 1);
+}
+| FALSE {
+    auto BoolType = TypeContext::find("bool");
+    $$ = new IntegerLiteral(BoolType, 0);
 }
 ;
 
@@ -443,13 +482,14 @@ ExprStmtList
     auto expr_stmt = $1;
     expr_stmt_tail = expr_stmt;
     $$ = expr_stmt;
+    $$->Next = nullptr;
 }
 | ExprStmtList COMMA ExprStmt{
     auto expr_stmt = $3;
     expr_stmt_tail -> Next = expr_stmt;
-    expr_stmt -> Prev = expr_stmt_tail;
-    expr_stmt_tail = expr_stmt_tail -> Next;
+    expr_stmt_tail = $3;
     $$ = $1;
+    $3->Next = nullptr;
 }
 ;
 

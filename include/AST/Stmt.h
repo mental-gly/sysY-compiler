@@ -498,4 +498,25 @@ private:
     std::string Literal;
 };
 
+
+class Cast : public ExprStmt {
+    uint8_t SubClassID { Stmt::kCast };
+public:
+    Cast() = delete;
+    Cast(ExprStmt *Src, TypeInfo *DestType);
+public:
+    TypeInfo *getType(CompileUnitDecl *U) override { return DestType; }
+    TypeInfo *getSrcType(CompileUnitDecl *U) { return SrcExpr->getType(U); }
+    llvm::Value *CodeGen(CompileUnitDecl *U) override;
+    virtual unsigned getStmtID() const override {
+        return SubClassID;
+    }
+#if !defined(NDEBUG)
+    void dump() override;
+#endif
+private:
+    TypeInfo *DestType;
+    ExprStmt *SrcExpr;
+};
+
 #endif // AST_H 

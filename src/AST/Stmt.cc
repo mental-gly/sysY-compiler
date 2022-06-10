@@ -296,6 +296,8 @@ Value *ArraySubscriptStmt::CodeGen(CompileUnitDecl *U) {
         auto GEP = builder->CreateGEP(BaseVal->getType()->getPointerElementType(),
                                   BaseVal,
                                   IdxArray);
+        // GEP->print(errs(), true);
+        // errs() << "\n";
         return GEP;
     }
     // Temporarily not support Struct.
@@ -362,6 +364,21 @@ static Value *doGreater(IRBuilder<> *builder, Value *LHS, Value *RHS, bool isSig
     return nullptr;
 }
 
+static Value *doGreaterEqual(IRBuilder<> *builder, Value *LHS, Value *RHS, bool isSigned) {
+    // We suppose after semantic analysis or carefully
+    // write code, LHS and RHS has the same type.
+    if (LHS->getType()->isIntegerTy()) {
+        auto LType = dyn_cast<IntegerType>(LHS->getType());
+        auto RType = dyn_cast<IntegerType>(RHS->getType());
+        if (isSigned) return builder->CreateICmpSGE(LHS, RHS);
+        else return builder->CreateICmpUGE(LHS, RHS);
+    }
+    if (LHS->getType()->isDoubleTy() || LHS->getType()->isFloatTy()) {
+        return builder->CreateFCmpOGE(LHS, RHS);
+    }
+    return nullptr;
+}
+
 static Value *doLess(IRBuilder<> *builder, Value *LHS, Value *RHS, bool isSigned) {
     // We suppose after semantic analysis or carefully
     // write code, LHS and RHS has the same type.
@@ -420,6 +437,20 @@ static Value *doNEqual(IRBuilder<> *builder, Value *LHS, Value *RHS) {
     return nullptr;
 }
 
+llvm::Value *doAdd(IRBuilder<> *builder, Value *LHS, Value *RHS) {
+    if (LHS->getType()->isIntegerTy() && RHS->getType()->isPointerTy()) {
+        return builder->CreateGEP(RHS->getType()->getPointerElementType(),
+                                  RHS,
+                                  LHS);
+    }
+    if (LHS->getType()->isPointerTy() && RHS->getType()->isIntegerTy()) {
+        return builder->CreateGEP(LHS->getType()->getPointerElementType(),
+                                  LHS,
+                                  RHS);
+    }
+    return builder->CreateAdd(LHS, RHS);
+}
+
 
 Value *BinaryOperatorStmt::CodeGen(CompileUnitDecl *U) {
     auto builder = U->getBuilder();
@@ -442,18 +473,23 @@ Value *BinaryOperatorStmt::CodeGen(CompileUnitDecl *U) {
     if (Operands[0]->getType() != Operands[1]->getType()) {
 
     }
+
     // neglect Twine name
     CHECK_NE(Opcode, Unknown) << "Unknown Binary Operation Opcode!";
     switch (Opcode) {
-        case Add    :   return builder->CreateAdd(Operands[0], Operands[1]);
+        case Add    :   return doAdd(builder, Operands[0], Operands[1]);
         case Sub    :   return builder->CreateSub(Operands[0], Operands[1]);
         case Mul    :   return builder->CreateMul(Operands[0], Operands[1]);
         case Div    :   return doDiv(builder, Operands[0], Operands[1], isSigned);
         case Assign :   return builder->CreateStore(Operands[1], Operands[0]);
         case Greater :  return doGreater(builder, Operands[0], Operands[1], isSigned);
+        case GreaterEqual : return doGreaterEqual(builder, Operands[0], Operands[1], isSigned);
         case Less :     return doLess(builder, Operands[0], Operands[1], isSigned);
         case LessEqual :    return doLessEqual(builder, Operands[0], Operands[1], isSigned);
+        case Equal : return doEqual(builder, Operands[0], Operands[1]);
         case NotEqual : return doNEqual(builder, Operands[0], Operands[1]);
+        case And : return builder->CreateAnd(Operands[0], Operands[1]);
+        case Or : return builder->CreateOr(Operands[0], Operands[1]);
         default:
             LOG(FATAL) << "Not Implemented binary operation";
     }
@@ -554,4 +590,35 @@ Value *::StringLiteral::CodeGen(CompileUnitDecl *U) {
     auto Idx = ConstantInt::get(Type::getInt64Ty(*context), 0);
     auto GEP = builder->CreateGEP(ConstStringArray->getType()->getPointerElementType(), ConstStringArray, {Idx, Idx});
     return GEP;
+}
+
+//===-- Cast --===//
+Cast::Cast(ExprStmt *Src, TypeInfo *DestType)
+    : ExprStmt(RValue), DestType(DestType), SrcExpr(Src) {}
+
+llvm::Value *Cast::CodeGen(CompileUnitDecl *U) {
+    auto builder = U->getBuilder();
+    llvm::Value *SrcV = SrcExpr->CodeGen(U);
+    if (SrcExpr->getValueKind() == ExprStmt::LValue)
+        SrcV = builder->CreateLoad(SrcV->getType()->getPointerElementType(), SrcV);
+
+    auto SrcT = SrcV->getType();
+    auto DesT = DestType->Type;
+    llvm::Instruction::CastOps Opcode = llvm::Instruction::CastOps::FPToSI;
+    if ((SrcT->isFloatTy() || SrcT->isDoubleTy()) && (DesT->isIntegerTy())) {
+        return builder->CreateCast(llvm::Instruction::FPToSI, SrcV, DesT);
+    }
+    if ((SrcT->isIntegerTy()) && (DesT->isFloatTy() || DesT->isDoubleTy())) {
+        return builder->CreateCast(llvm::Instruction::SIToFP, SrcV, DesT);
+    }
+    if ((SrcT->isIntegerTy()) && (DesT->isIntegerTy())) {
+        if (SrcT->getIntegerBitWidth() < DesT->getIntegerBitWidth()) {
+            return builder->CreateCast(llvm::Instruction::SExt, SrcV, DesT);
+        }
+        else {
+            return builder->CreateCast(llvm::Instruction::Trunc, SrcV, DesT);
+        }
+    }
+
+    return nullptr;
 }

@@ -28,6 +28,8 @@ HANDLE_AST_STMT_EXPR(IntegerLiteral)
 HANDLE_AST_STMT_EXPR(FloatingLiteral)
 HANDLE_AST_STMT_EXPR(StringLiteral)
 
+// Cast
+HANDLE_AST_STMT_EXPR(Cast)
 
 #undef HANDLE_AST_STMT
 

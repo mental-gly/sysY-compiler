@@ -7,7 +7,10 @@
 	#include <map>
 	#include "parser.tab.hh"
 
-    extern bool ImportStdio = false;
+    extern bool ImportStdio;
+    extern bool ImportString;
+    bool ImportStdio = false;
+    bool ImportString = false;
 	using namespace std;
 	typedef std::map<std::string, std::string> TStrStrMap;
 	typedef std::pair<std::string, std::string> TStrStrPair;
@@ -63,6 +66,8 @@ CLOSEBRACKET "]"
 SEMICOLON ";"
 COMMA ","
 
+TRUE "true"
+FALSE "false"
 CONST "const"
 VOID "void"
 IF "if"
@@ -72,15 +77,20 @@ BREAK "break"
 CONTINUE "continue"
 RETURN  "return"
 INTEGER "int"
+DOUBLE "double"
 BOOLEAN  "bool"
 CHAR "char"
 STRING "string"
 STDIO "use std.io;"
-escape \\n|\\t|\\r|\\\'|\\\"
+STDSTRING "use std.string;"
+CAST "cast"
+GENERIC_BEGIN "::<"
+GENERIC_END ">::"
+escape \\n|\\t|\\r|\\\'|\\\"|\\0
 s_char [^\\\"\n]|{escape}
 c_char [^\\\'\n]|{escape}
 StringLiteral \"{s_char}+\"
-CharConst '\{c_char}+\'
+CharConst \'{c_char}+\'
 
 OCT 0[0-7]+
 DEC -?[0-9]+
@@ -133,6 +143,9 @@ FORMATCHAR [\r\n\t ]+
 {STDIO} {
     ImportStdio = true;
 }
+{STDSTRING} {
+    ImportString = true;
+}
 {StringLiteral} {
     // Remove " "
     yylval.str_val = new std::string(yytext + 1, yyleng - 2);
@@ -141,8 +154,36 @@ FORMATCHAR [\r\n\t ]+
 
 {INTEGER} {return INTEGER;}
 {BOOLEAN} {return BOOLEAN;}
+{DOUBLE} { return DOUBLE; }
 {CHAR} {return CHAR;}
+{CharConst} {
+    // translation.
+    if (yytext[1] == '\\') {
+        if (yytext[2] == 'n') {
+            yylval.int_val = (int)'\n';
+        }
+        if (yytext[2] == 't') {
+            yylval.int_val = (int)'\t';
+        }
+        if (yytext[2] == '\\') {
+            yylval.int_val = (int)'\\';
+        }
+        if (yytext[2] == '0') {
+            yylval.int_val = (int)0;
+        }
+    }
+    else {
+        yylval.int_val = (int)yytext[1];
+    }
+    return CharConst;
+ }
 
+ {CAST} { return CAST; }
+ {GENERIC_BEGIN} { return GENERIC_BEGIN; }
+ {GENERIC_END} { return GENERIC_END; }
+
+{TRUE} { return TRUE; }
+{FALSE} { return FALSE; }
 {OCT} {yylval.int_val = strtol(yytext, nullptr, 0); return INT_CONST;}
 {DEC} {yylval.int_val = strtol(yytext, nullptr, 0); return INT_CONST;}
 {HEX} {yylval.int_val = strtol(yytext, nullptr, 0); return INT_CONST;}

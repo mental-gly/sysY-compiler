@@ -128,6 +128,8 @@ void ::BinaryOperatorStmt::dump() {
         case NotEqual : OpName = "!="; break;
         case GreaterEqual : OpName = ">="; break;
         case LessEqual : OpName = "<=";break;
+        case And : OpName = "&&"; break;
+        case Or : OpName = "||"; break;
     }
     DUMP_NEWLINE(OpName);
     Indent.push_back(dump_indent);
@@ -177,6 +179,11 @@ void WhileStmt::dump() {
     Body->dump();
     dump_indent--;
 }
+
+void Cast::dump() { {
+        DUMP_WITH_IDENT(dump_indent, Cast);
+        DUMP_NEWLINE("");
+}}
 
 
 //===-- Declaration dumps --===//

@@ -60,6 +60,8 @@ public:
     CompileUnitDecl(const std::string &FileName, Decl *Decls = nullptr);
 public:
     void CreateSubDecls(Decl *);
+    void setRuntimeHeader(const std::string &Path) { HeaderPath = Path; }
+    std::string getRuntimeHeader() const { return HeaderPath; }
     llvm::ArrayRef<Decl *> getDecls() { return Decls; }
     llvm::LLVMContext *getContext() const { return Context.get(); }
     llvm::IRBuilder<> *getBuilder() const { return Builder.get(); }
@@ -72,6 +74,7 @@ public:
 #endif
     SymbolTable<llvm::Value *> Symbol;
 private:
+    std::string HeaderPath;
     llvm::SmallVector<Decl *, 10> Decls;
     std::unique_ptr<llvm::LLVMContext> Context;
     std::unique_ptr<llvm::IRBuilder<>> Builder;

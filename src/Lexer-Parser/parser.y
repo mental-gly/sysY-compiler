@@ -128,13 +128,11 @@ Function
     auto type = $1;
     auto ident = $2;
     auto param_list = $4;
-    LOG(INFO) << "Function "<< *ident;
     $$ = new FunctionDecl(TypeContext::find(*type), *ident, static_cast<ParamDecl*>(param_list));
 }
 | basicType IDENTIFIER OPENPAREN  CLOSEPAREN {
     auto type = $1;
     auto ident = $2;
-    LOG(INFO) << "Function "<< *ident;
     $$ = new FunctionDecl(TypeContext::find(*type), *ident, nullptr);
 }
 ;
@@ -159,13 +157,11 @@ ParamDecl
     auto ident = $2;
     $$ = new ParamDecl(TypeContext::find(*type), *ident);
     $$->Next = nullptr;
-    LOG(INFO) << "ParamDecl " << *($2) << " '" << *($1) << "'";
 }
 | basicType IDENTIFIER OPENBRACKET CLOSEBRACKET{
     auto type = $1;
     auto ident = $2;
     $$ = new ParamDecl(REGISTER_POINTER(*type), *ident);
-    LOG(INFO) << "ParamDecl " << *($2) << " '" << *($1) << "'";
 }
 | basicType IDENTIFIER OPENBRACKET IntegerLiteral CLOSEBRACKET {
     auto type = $1;
@@ -179,7 +175,6 @@ Block
 : OPENBRACE CompoundStmtList CLOSEBRACE{
     auto comp_stmt = $2;
     $$ = new CompoundStmt(comp_stmt);
-    LOG(INFO) << "Block with CompoundStmt list header :" << $2;
 }
 | OPENBRACE CLOSEBRACE {
     $$ = new CompoundStmt(nullptr);
@@ -233,14 +228,12 @@ CompoundStmtList
 Stmt
 : DeclStmt {
     $$ = $1;
-    LOG(INFO) << "DeclStmt as CompoundStmt list header : " << $$;
 }
 | ReturnStmt {
     $$ = $1;
 }
 | IfStmt {
     $$ = $1;
-    LOG(INFO) << "Add IF to CompoundStmt tail";
 }
 | WhileStmt {
     $$ = $1;
@@ -280,7 +273,6 @@ MatchedStmt
     auto match_stmt = $5;
     auto smatch_stmt = $7;
     $$ = new IfStmt(static_cast<ExprStmt*>(expr_stmt), match_stmt, smatch_stmt);
-    LOG(INFO) << "Matched IF";
 }
 
 UnmatchedStmt
@@ -288,7 +280,6 @@ UnmatchedStmt
     auto expr_stmt = $3;
     auto match_stmt = $5;
     $$ = new IfStmt(static_cast<ExprStmt*>(expr_stmt), match_stmt);
-    LOG(INFO) << "Unmatched IF";
 }
 ;
 
@@ -314,7 +305,6 @@ DeclStmt
     var->setInit(nullptr);
     auto num = $4 -> getVal();
     $$ = new DeclStmt(var);
-    LOG(INFO) << "Array Var";
     $$ -> setType(TypeContext::createArrayType(*type, num));
 }
 | basicType IDENTIFIER OPENBRACKET IntegerLiteral CLOSEBRACKET OPENBRACKET IntegerLiteral CLOSEBRACKET SEMICOLON{
@@ -326,7 +316,6 @@ DeclStmt
     auto num_1 = $4 -> getVal();
     auto num_2 = $7 -> getVal();
     $$ = new DeclStmt(var);
-    LOG(INFO) << "Array Var";
     // Reverse Order.
     $$ -> setType(TypeContext::createArrayType(*type, {num_2, num_1}));
 }

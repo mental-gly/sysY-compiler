@@ -11,6 +11,6 @@ set(AST_SOURCES
 )
 
 add_library(AST STATIC ${AST_SOURCES})
-target_link_libraries(AST INTERFACE ${LLVM_LIBS}
+target_link_libraries(AST INTERFACE LLVM
         )
 set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)

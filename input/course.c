@@ -137,9 +137,9 @@ int main() {
             credit[course] = cur_credit;
             gpa[course] = cur_gpa;
             char *res;
-            res = strchr(str, cast::<int>::('|'));
+            res = strchr(&str[0], cast::<int>::('|'));
             res = res + 1;
-            res = strchr(res, cast::<int>::('|'));
+            res = strchr(&res[0], cast::<int>::('|'));
             res = res + 1;
             int len;
             len = cast::<int>::(strlen(res));

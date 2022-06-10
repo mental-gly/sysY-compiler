@@ -242,7 +242,6 @@ llvm::Function *FunctionDecl::CodeGen(CompileUnitDecl *U) {
 
             // Store Args.
             for (auto &Arg : F->args()) {
-                LOG(INFO) << "In function " << F->getName().str() << " Param: " << Arg.getName().str() << "\n";
                 llvm::AllocaInst *Alloca = builder->CreateAlloca(Arg.getType(),
                                          0, Params[Arg.getArgNo()]->getName());
                 // add to symbol table.
@@ -269,9 +268,8 @@ llvm::Function *FunctionDecl::CodeGen(CompileUnitDecl *U) {
             builder->CreateRet(RetVal);
             builder->ClearInsertionPoint();
             U->Symbol.LeaveScope();
-
-#if defined(SHOW_CFG)
             llvm::verifyFunction(*F, &llvm::errs());
+#if defined(SHOW_CFG)
             F->viewCFG(false, nullptr, nullptr);
 #endif
         }

@@ -7,6 +7,7 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace llvm;
 
+#if !defined(NDEBUG)
 static int dump_indent = 0;
 SmallVector<int, 10> Indent;
 
@@ -232,3 +233,5 @@ void ParamDecl::dump() {
     DUMP_WITH_IDENT(dump_indent, ParamDecl);
     DUMP_NEWLINE(Name);
 }
+
+#endif

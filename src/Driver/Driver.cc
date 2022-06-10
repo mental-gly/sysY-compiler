@@ -40,13 +40,12 @@ cl::opt<OptLevel> OptimizationLevel(cl::desc("Optimization level:"),
                                             ),
                                     cl::init(O0));
 cl::opt<bool> EmitAssembly("S", cl::desc("emit LLVM IR"), cl::init(false));
-cl::opt<bool> EmitLLVMFile("emit-llvm", cl::desc("emit LLVM IR '.ll' or '.bc' file"), cl::init(false));
+// cl::opt<bool> EmitLLVMFile("emit-llvm", cl::desc("emit LLVM IR '.ll' or '.bc' file"), cl::init(false));
 cl::opt<bool> EmitObject("c", cl::desc("emit object file"), cl::init(false));
 cl::opt<std::string> RuntimeHeaderDir("I", cl::desc("directory of builtin runtime function header llvm .ll files"),
                                       cl::value_desc("directory"),
                                       cl::init(RUNTIME_HEADER));
 
-CompileUnitDecl *ParseAST();
 Module *GenLLVMIR(CompileUnitDecl *Unit) {
     Unit->CodeGen();
     return Unit->getModule();
@@ -82,14 +81,9 @@ TargetMachine *GetTargetMachine(Module *module) {
     return TargetMachine;
 }
 
-void EmitObjectFile(Module *module, TargetMachine *target) {
+void EmitObjectFile(const std::string &ObjectFileName,
+                    Module *module, TargetMachine *target) {
     // Configuring output filesystem.
-    std::string ObjectFileName;
-    if (!OutputFileName.empty()) {
-        ObjectFileName = OutputFileName;
-    } else {
-        ObjectFileName = InputFileName + ".o";
-    }
     std::error_code ErrorCode;
     raw_fd_ostream dest(ObjectFileName, ErrorCode, sys::fs::OF_None);
     if (ErrorCode) {
@@ -110,14 +104,10 @@ void EmitObjectFile(Module *module, TargetMachine *target) {
     dest.flush();
 }
 
-void EmitLLVMIR(Module *module) {
+void EmitLLVMIR(const std::string &IRFileName,
+                Module *module) {
     // Configuring output filesystem.
-    std::string IRFileName;
-    if (!OutputFileName.empty()) {
-        IRFileName = OutputFileName;
-    } else {
-        IRFileName = InputFileName + ".ll";
-    }
+
     std::error_code ErrorCode;
     raw_fd_ostream dest(IRFileName, ErrorCode, sys::fs::OF_None);
     if (ErrorCode) {
@@ -179,19 +169,27 @@ int main(int argc, char **argv, char **envp) {
     TargetMachine *target = GetTargetMachine(module);
     RunOptPasses(module, target);
     if (EmitAssembly) {
-        EmitLLVMIR(module);
+        std::string IRFileName;
+        if (!OutputFileName.empty()) {
+            IRFileName = OutputFileName;
+        } else {
+            IRFileName = InputFileName + ".ll";
+        }
+        EmitLLVMIR(IRFileName, module);
     }
     else if (EmitObject) {
-        EmitObjectFile(module, target);
-    }
-    else {
         std::string ObjectFileName;
         if (!OutputFileName.empty()) {
             ObjectFileName = OutputFileName;
         } else {
             ObjectFileName = InputFileName + ".o";
         }
-        EmitObjectFile(module, target);
+        EmitObjectFile(ObjectFileName, module, target);
+    }
+    else {
+        std::string ObjectFileName;
+        ObjectFileName = InputFileName + ".o";
+        EmitObjectFile(ObjectFileName, module, target);
         // GNU gold linker command line.
         // link mode. -no-pie (generate executable).
         char *ld_argv[] = {"gcc", "example.c.o", "-no-pie", "-o", "a.out", NULL};
@@ -199,8 +197,7 @@ int main(int argc, char **argv, char **envp) {
         if (!OutputFileName.empty()) {
             ld_argv[4] = const_cast<char *>(OutputFileName.c_str());
         }
-        status = execve("/usr/bin/gcc", ld_argv, envp);
-         // remove(ObjectFileName.c_str());
+        CHECK_EQ(execve("/usr/bin/gcc", ld_argv, envp), 0);
     }
     return 0;
 }
